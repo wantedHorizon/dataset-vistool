@@ -61,6 +61,13 @@ function aspectLabel(w: number, h: number): string {
 // shows up in both places automatically.
 export const COLUMNS: ColumnDef[] = [
   {
+    key: "id",
+    label: "id",
+    width: 70,
+    defaultVisible: false,
+    render: (row) => row.id,
+  },
+  {
     key: "image",
     label: "image",
     width: 130,
@@ -82,13 +89,7 @@ export const COLUMNS: ColumnDef[] = [
       />
     ),
   },
-  {
-    key: "id",
-    label: "id",
-    width: 70,
-    defaultVisible: false,
-    render: (row) => row.id,
-  },
+
   {
     key: "name",
     label: "name",
