@@ -1,12 +1,19 @@
+import { useState } from "react";
 import {
   Box,
+  Button,
+  Checkbox,
   InputAdornment,
+  ListItemText,
+  Menu,
   MenuItem,
   TextField,
   ToggleButton,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import CodeIcon from "@mui/icons-material/Code";
+import ViewColumnIcon from "@mui/icons-material/ViewColumn";
+import { COLUMNS } from "./tableColumns";
 
 interface Props {
   split: string;
@@ -16,6 +23,8 @@ interface Props {
   sqlOpen: boolean;
   onToggleSql: () => void;
   splitCounts: Record<string, number>;
+  visibleColumns: string[];
+  onToggleColumn: (key: string) => void;
 }
 
 export default function Toolbar({
@@ -26,7 +35,13 @@ export default function Toolbar({
   sqlOpen,
   onToggleSql,
   splitCounts,
+  visibleColumns,
+  onToggleColumn,
 }: Props) {
+  const [colsAnchor, setColsAnchor] = useState<null | HTMLElement>(null);
+  const visible = new Set(visibleColumns);
+  const toggleable = COLUMNS.filter((c) => !c.fixed);
+
   return (
     <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center", mb: 2 }}>
       <TextField
@@ -59,6 +74,24 @@ export default function Toolbar({
           ),
         }}
       />
+
+      <Button
+        size="small"
+        variant="outlined"
+        color="inherit"
+        startIcon={<ViewColumnIcon fontSize="small" />}
+        onClick={(e) => setColsAnchor(e.currentTarget)}
+      >
+        Columns
+      </Button>
+      <Menu anchorEl={colsAnchor} open={Boolean(colsAnchor)} onClose={() => setColsAnchor(null)}>
+        {toggleable.map((c) => (
+          <MenuItem key={c.key} dense onClick={() => onToggleColumn(c.key)}>
+            <Checkbox edge="start" size="small" checked={visible.has(c.key)} disableRipple />
+            <ListItemText primary={c.label || c.key} />
+          </MenuItem>
+        ))}
+      </Menu>
 
       <ToggleButton
         size="small"
