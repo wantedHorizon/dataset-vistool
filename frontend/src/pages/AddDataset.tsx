@@ -24,7 +24,10 @@ export default function AddDataset() {
   );
 
   useEffect(() => {
-    if (status?.status === "ready" && datasetId) {
+    if (
+      (status?.status === "schema_ready" || status?.status === "ready") &&
+      datasetId
+    ) {
       navigate(`/datasets/${datasetId}/schema`);
     }
   }, [status?.status, datasetId, navigate]);
@@ -36,7 +39,9 @@ export default function AddDataset() {
 
   const isWorking =
     create.isPending ||
+    status?.status === "fetching_metadata" ||
     status?.status === "downloading" ||
+    status?.status === "schema_ready" ||
     status?.status === "parsing";
 
   return (
@@ -46,8 +51,8 @@ export default function AddDataset() {
           Add Dataset
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Paste a HuggingFace dataset URL. The app will download parquet files and README.md,
-          then parse the README to suggest field definitions.
+          Paste a HuggingFace dataset URL. Schema is extracted from the dataset card immediately;
+          parquet files download in the background while you edit fields.
         </Typography>
 
         <Paper variant="outlined" sx={{ p: 3 }}>

@@ -3,12 +3,14 @@ import os
 import sqlite3
 from typing import Optional
 
-from .dataset_registry import db_path, init_registry, load_schema
+from app.config import DATA_ROOT
+from app.models.dataset import DatasetSchema
+from app.services.registry import db_path, init_registry, load_schema
 
 
 def get_db_path(dataset_id: Optional[str] = None) -> str:
     if dataset_id is None:
-        from .dataset_registry import get_active_dataset_id
+        from app.services.registry import get_active_dataset_id
 
         dataset_id = get_active_dataset_id()
         if dataset_id is None:
@@ -17,7 +19,6 @@ def get_db_path(dataset_id: Optional[str] = None) -> str:
 
 
 def get_connection(dataset_id: Optional[str] = None) -> sqlite3.Connection:
-    """A normal read/write connection with row access by column name."""
     path = get_db_path(dataset_id)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
@@ -25,7 +26,6 @@ def get_connection(dataset_id: Optional[str] = None) -> sqlite3.Connection:
 
 
 def get_readonly_connection(dataset_id: Optional[str] = None) -> sqlite3.Connection:
-    """A read-only connection, used for the user-facing SQL console."""
     path = get_db_path(dataset_id)
     uri = f"file:{path}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)

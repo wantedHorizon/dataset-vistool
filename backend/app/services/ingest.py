@@ -8,9 +8,10 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from PIL import Image
 
-from .dataset_registry import db_path, load_schema, update_ingest_status
-from .dataset_schema import DatasetSchema, FieldDef, FieldType
-from .db import db_exists_and_populated
+from app.db.columns import db_columns, fts_columns
+from app.db.connection import db_exists_and_populated
+from app.models.dataset import DatasetSchema, FieldType
+from app.services.registry import db_path, load_schema, update_ingest_status
 
 THUMB_MAX = 256
 
@@ -40,60 +41,10 @@ def _storage_sql(ftype: FieldType) -> str:
     return "TEXT"
 
 
-def _db_columns(schema: DatasetSchema) -> List[str]:
-    """SQLite column names for the samples table."""
-    cols = ["split"]
-    for f in schema.fields:
-        if f.type == FieldType.split:
-            continue
-        if f.type == FieldType.text_list:
-            if f.group_members:
-                cols.extend(f.group_members)
-            continue
-        if f.type == FieldType.image:
-            cols.append(f.name)
-            if "width" not in cols:
-                cols.append("width")
-            if "height" not in cols:
-                cols.append("height")
-            if "thumbnail" not in cols:
-                cols.append("thumbnail")
-            continue
-        cols.append(f.name)
-    # Deduplicate preserving order
-    seen: set[str] = set()
-    out = []
-    for c in cols:
-        if c not in seen:
-            seen.add(c)
-            out.append(c)
-    return out
-
-
-def _fts_columns(schema: DatasetSchema) -> List[str]:
-    cols = []
-    for f in schema.fields:
-        if f.type == FieldType.text_list and f.group_members:
-            cols.extend(m for m in f.group_members if _is_searchable_member(schema, m))
-        elif f.searchable and f.type not in (FieldType.split, FieldType.image, FieldType.blob):
-            cols.append(f.name)
-    seen: set[str] = set()
-    return [c for c in cols if not (c in seen or seen.add(c))]
-
-
-def _is_searchable_member(schema: DatasetSchema, name: str) -> bool:
-    for f in schema.fields:
-        if f.name == name:
-            return f.searchable
-        if f.group_members and name in f.group_members:
-            return f.searchable
-    return False
-
-
 def create_schema(conn: sqlite3.Connection, schema: DatasetSchema) -> None:
-    db_cols = _db_columns(schema)
-    col_defs = ", ".join(f"{c} {_storage_sql_for_col(c, schema)}" for c in db_cols)
-    fts_cols = _fts_columns(schema)
+    cols = db_columns(schema)
+    col_defs = ", ".join(f"{c} {_storage_sql_for_col(c, schema)}" for c in cols)
+    fts_cols = fts_columns(schema)
 
     conn.executescript(
         f"""
@@ -147,7 +98,7 @@ def _get_nested(row: dict, path: str) -> Any:
 def _extract_row_values(
     r: dict, schema: DatasetSchema, split: str, thumb_max: int
 ) -> tuple:
-    db_cols = _db_columns(schema)
+    cols = db_columns(schema)
     values: Dict[str, Any] = {"split": split}
 
     for f in schema.fields:
@@ -179,13 +130,12 @@ def _extract_row_values(
                 val = None
         values[f.name] = val
 
-    # Group member columns
     for f in schema.fields:
         if f.type == FieldType.text_list and f.group_members:
             for m in f.group_members:
                 values[m] = r.get(m)
 
-    return tuple(values.get(c) for c in db_cols)
+    return tuple(values.get(c) for c in cols)
 
 
 def ingest_dataset(dataset_id: str, force: bool = False) -> int:
@@ -196,7 +146,7 @@ def ingest_dataset(dataset_id: str, force: bool = False) -> int:
     if not force and db_exists_and_populated(dataset_id):
         conn = sqlite3.connect(path)
         try:
-            fts_cols = _fts_columns(schema)
+            fts_cols = fts_columns(schema)
             if fts_cols:
                 conn.execute("INSERT INTO samples_fts(samples_fts) VALUES('rebuild')")
                 conn.commit()
@@ -219,7 +169,7 @@ def ingest_dataset(dataset_id: str, force: bool = False) -> int:
 
     conn = sqlite3.connect(path)
     create_schema(conn, schema)
-    db_cols = _db_columns(schema)
+    cols = db_columns(schema)
     thumb_max = 256
 
     total = 0
@@ -231,15 +181,15 @@ def ingest_dataset(dataset_id: str, force: bool = False) -> int:
             for _, row in df.iterrows():
                 r = row.to_dict()
                 rows.append(_extract_row_values(r, schema, split, thumb_max))
-            placeholders = ", ".join(["?"] * len(db_cols))
+            placeholders = ", ".join(["?"] * len(cols))
             conn.executemany(
-                f"INSERT INTO samples ({', '.join(db_cols)}) VALUES ({placeholders})",
+                f"INSERT INTO samples ({', '.join(cols)}) VALUES ({placeholders})",
                 rows,
             )
             conn.commit()
             total += len(rows)
 
-        fts_cols = _fts_columns(schema)
+        fts_cols = fts_columns(schema)
         if fts_cols:
             conn.execute("INSERT INTO samples_fts(samples_fts) VALUES('rebuild')")
             conn.commit()
@@ -263,9 +213,8 @@ def _count_rows(path: str) -> int:
         conn.close()
 
 
-# Legacy entry point
-def ingest() -> None:
-    from .dataset_registry import get_active_dataset_id, list_dataset_ids
+def ingest_all_pending() -> None:
+    from app.services.registry import get_active_dataset_id, list_dataset_ids
 
     for did in list_dataset_ids():
         schema = load_schema(did)
@@ -280,4 +229,4 @@ def ingest() -> None:
 
 
 if __name__ == "__main__":
-    ingest()
+    ingest_all_pending()

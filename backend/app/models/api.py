@@ -1,22 +1,32 @@
-"""Pydantic response/request models."""
+"""API request/response DTOs."""
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
-from .dataset_schema import (
-    CreateDatasetRequest,
-    CreateDatasetResponse,
-    DatasetSchema,
-    DatasetSummary,
-    DownloadStatus,
-    FieldDef,
-    UpdateDatasetRequest,
-)
+from .dataset import FieldDef
 
 
-class SampleRecord(BaseModel):
-    id: int
-    data: Dict[str, Any]
+class DatasetSummary(BaseModel):
+    id: str
+    name: str
+    source_url: Optional[str] = None
+    download_status: str
+    ingest_status: str
+    row_count: int = 0
+
+
+class CreateDatasetRequest(BaseModel):
+    url: str
+
+
+class CreateDatasetResponse(BaseModel):
+    id: str
+    status: str
+
+
+class UpdateDatasetRequest(BaseModel):
+    name: Optional[str] = None
+    fields: Optional[List[FieldDef]] = None
 
 
 class SamplesPage(BaseModel):
@@ -48,3 +58,4 @@ class ActiveDatasetResponse(BaseModel):
 class ReparseResponse(BaseModel):
     fields: List[FieldDef]
     warnings: List[str]
+    schema_source: Optional[str] = None

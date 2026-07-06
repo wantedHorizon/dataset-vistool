@@ -36,8 +36,8 @@ Backend only (`cd backend`, with venv active):
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m app.ingest    # one-time: parquet -> backend/data/flickr8k.db (idempotent, safe to rerun)
 uvicorn app.main:app --reload --port 8000
+npm run db:drop          # wipe registry + all dataset DBs (python -m app.registry_cli drop)
 ```
 
 Docker (the actual "clone and run" path — not Turborepo):
@@ -46,35 +46,34 @@ docker compose up --build   # frontend on :8080 (nginx), backend on :8000
 docker compose down         # add -v to also drop the db-data volume and force re-ingestion
 ```
 
-There is no test suite implemented yet — `testing-plan.md` specifies the intended pytest
-(backend) and Vitest+RTL+MSW (frontend) approach in detail; follow it when adding tests
-rather than improvising a different structure.
+There is a backend pytest suite under `backend/tests/` (mirrors the package layout); the
+frontend test suite is still not implemented — `testing-plan.md` specifies the intended
+Vitest+RTL+MSW approach in detail.
 
 ## Architecture
 
-**Data flow**: `flickr8k/data/*.parquet` → `backend/app/ingest.py` (runs once, on backend
-startup, idempotent via `db_exists_and_populated()`) → a single SQLite file
-(`backend/data/flickr8k.db` locally, or `/data/db/flickr8k.db` on a named Docker volume) →
-served by FastAPI → consumed by the React frontend, entirely through same-origin `/api/*`
-calls (proxied by Vite in dev, by nginx in the Docker image).
+**Data flow**: HuggingFace parquet (or local seed data) → `services/ingest.py` (runs on
+backend startup via `lifespan`, idempotent via `db_exists_and_populated()`) → per-dataset
+SQLite files under `backend/data/datasets/{id}.db` → served by FastAPI → consumed by the
+React frontend through same-origin `/api/*` calls (proxied by Vite in dev, nginx in Docker).
 
-**Backend** (`backend/app/`) is intentionally a flat, single-file-per-concern FastAPI app,
-no ORM:
-- `db.py` — `DB_PATH` resolution (env override for Docker), `get_connection()` (normal
-  read/write), `get_readonly_connection()` (opens `file:...?mode=ro` — used *only* by the
-  `/api/sql` console, never by the app's own read/write paths).
-- `ingest.py` — creates the `samples` table (captions, dims, `image`/`thumbnail` BLOBs) plus
-  a `samples_fts` FTS5 external-content virtual table (`content='samples', content_rowid='id'`)
-  for caption search; decodes each image with Pillow to get width/height and build a ≤256px
-  JPEG thumbnail. Split (`train`/`validation`/`test`) is inferred from the parquet filename.
-- `main.py` — all routes. Notable non-obvious pieces:
-  - `_fts_query()` tokenizes free text into an `AND`-joined FTS5 prefix query; returns `None`
-    (not an empty-string query) when there are no `\w+` tokens, so punctuation-only search
-    falls back to unfiltered results instead of sending a degenerate MATCH expression.
-  - `/api/sql` is deliberately restrictive: only `SELECT`/`WITH`, rejects embedded `;`
-    (single statement only), runs on the read-only connection, caps rows at
-    `MAX_SQL_ROWS`, and redacts any `bytes`/`bytearray` column value as
-    `"<blob N bytes>"` — this is what makes an open SQL console safe to expose in the UI.
+**Backend** (`backend/app/`) is layered by package, no ORM:
+- `config.py` — `DATA_ROOT`, path constants, `MAX_SQL_ROWS`, env overrides.
+- `models/` — Pydantic: `dataset.py` (domain schema), `api.py` (request/response DTOs).
+- `api/` — FastAPI routers: `datasets.py`, `samples.py`, `sql.py` (thin; no query building).
+- `db/` — `connection.py` (SQLite helpers), `columns.py` (canonical schema→column derivation
+  shared by ingest and sample queries).
+- `services/` — `registry.py` (schema/registry persistence), `ingest.py`, `download.py`
+  (HF worker), `query.py` (`fts_query`, `row_to_dict`, WHERE assembly).
+- `schema_extraction/` — `card_mapper.py`, `md_parser.py` (HF card → field defs).
+- `bootstrap/seed.py` — Flickr8k seeding and legacy-DB migration on first boot.
+- `main.py` — app factory, CORS, `lifespan` (registry init + pending ingest), router mount.
+
+Notable behavior preserved from the original flat layout:
+- `services/query.py` `fts_query()` tokenizes free text into an `AND`-joined FTS5 prefix
+  query; returns `None` when there are no `\w+` tokens.
+- `/api/datasets/{id}/sql` is deliberately restrictive: only `SELECT`/`WITH`, rejects `;`,
+  read-only connection, caps rows at `MAX_SQL_ROWS`, redacts blob columns.
 
 **Frontend** (`frontend/src/`):
 - `App.tsx` is only a router shell (`react-router-dom`: `/` → `Home`, `*` → redirect to `/`).

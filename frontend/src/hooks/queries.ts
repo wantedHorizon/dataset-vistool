@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createDataset,
+  deleteDataset,
   fetchActiveDataset,
   fetchDataset,
   fetchDatasets,
@@ -9,6 +10,7 @@ import {
   fetchSamples,
   fetchStats,
   FieldDef,
+  reparseSchema,
   runSql,
   SamplesParams,
   setActiveDataset,
@@ -25,8 +27,14 @@ export function useDataset(id: string | null) {
     queryKey: ["dataset", id],
     queryFn: () => fetchDataset(id as string),
     enabled: id !== null,
-    refetchInterval: (query) =>
-      query.state.data?.ingest.status === "running" ? 2000 : false,
+    refetchInterval: (query) => {
+      const ingestRunning = query.state.data?.ingest.status === "running";
+      const dl = query.state.data?.download.status;
+      const downloadActive =
+        dl === "fetching_metadata" || dl === "downloading" || dl === "schema_ready";
+      if (ingestRunning || downloadActive) return 2000;
+      return false;
+    },
   });
 }
 
@@ -52,6 +60,19 @@ export function useCreateDataset() {
   });
 }
 
+export function useDeleteDataset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteDataset,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["datasets"] });
+      qc.invalidateQueries({ queryKey: ["activeDataset"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+      qc.invalidateQueries({ queryKey: ["samples"] });
+    },
+  });
+}
+
 export function useDownloadStatus(id: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["downloadStatus", id],
@@ -59,7 +80,25 @@ export function useDownloadStatus(id: string | null, enabled: boolean) {
     enabled: id !== null && enabled,
     refetchInterval: (query) => {
       const s = query.state.data?.status;
-      return s === "downloading" || s === "parsing" ? 1500 : false;
+      if (
+        s === "fetching_metadata" ||
+        s === "downloading" ||
+        s === "schema_ready" ||
+        s === "parsing"
+      ) {
+        return 1500;
+      }
+      return false;
+    },
+  });
+}
+
+export function useReparseSchema(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => reparseSchema(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dataset", id] });
     },
   });
 }

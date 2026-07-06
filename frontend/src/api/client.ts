@@ -22,7 +22,19 @@ export interface DatasetSchema {
   };
   fields: FieldDef[];
   ingest: { status: string; message?: string | null; row_count: number };
-  download: { status: string; progress?: string | null; message?: string | null };
+  download: DownloadStatus;
+}
+
+export interface DownloadStatus {
+  status: string;
+  progress?: string | null;
+  message?: string | null;
+  phase?: string | null;
+  schema_source?: string | null;
+  field_count?: number;
+  bytes_total?: number | null;
+  parquet_files_total?: number;
+  parquet_files_done?: number;
 }
 
 export interface DatasetSummary {
@@ -58,10 +70,10 @@ export interface SqlResponse {
   row_count: number;
 }
 
-export interface DownloadStatus {
-  status: string;
-  progress?: string | null;
-  message?: string | null;
+export interface ReparseResponse {
+  fields: FieldDef[];
+  warnings: string[];
+  schema_source?: string | null;
 }
 
 async function handle<T>(res: Response): Promise<T> {
@@ -115,6 +127,10 @@ export async function updateDataset(
   );
 }
 
+export async function deleteDataset(id: string): Promise<void> {
+  await handle(await fetch(dsBase(id), { method: "DELETE" }));
+}
+
 export async function fetchDownloadStatus(id: string): Promise<DownloadStatus> {
   return handle(await fetch(`${dsBase(id)}/download-status`));
 }
@@ -122,6 +138,10 @@ export async function fetchDownloadStatus(id: string): Promise<DownloadStatus> {
 export async function triggerIngest(id: string, force = false): Promise<{ status: string; row_count: number }> {
   const q = force ? "?force=true" : "";
   return handle(await fetch(`${dsBase(id)}/ingest${q}`, { method: "POST" }));
+}
+
+export async function reparseSchema(id: string): Promise<ReparseResponse> {
+  return handle(await fetch(`${dsBase(id)}/schema/reparse`, { method: "POST" }));
 }
 
 export async function fetchActiveDataset(): Promise<{ id: string | null }> {

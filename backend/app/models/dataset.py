@@ -1,4 +1,4 @@
-"""Pydantic models for per-dataset schema configuration."""
+"""Domain configuration models for per-dataset schema."""
 from enum import Enum
 from typing import List, Optional
 
@@ -20,7 +20,6 @@ class FieldDef(BaseModel):
     type: FieldType = FieldType.text
     visible: bool = True
     searchable: bool = False
-    # For text_list: member field names grouped under one column
     group_members: Optional[List[str]] = None
 
 
@@ -46,6 +45,12 @@ class DownloadStatus(BaseModel):
     status: str = "idle"
     progress: Optional[str] = None
     message: Optional[str] = None
+    phase: Optional[str] = None
+    schema_source: Optional[str] = None
+    field_count: int = 0
+    bytes_total: Optional[int] = None
+    parquet_files_total: int = 0
+    parquet_files_done: int = 0
 
 
 class DatasetSchema(BaseModel):
@@ -56,26 +61,3 @@ class DatasetSchema(BaseModel):
     fields: List[FieldDef] = Field(default_factory=list)
     ingest: JobStatus = Field(default_factory=JobStatus)
     download: DownloadStatus = Field(default_factory=DownloadStatus)
-
-
-class DatasetSummary(BaseModel):
-    id: str
-    name: str
-    source_url: Optional[str] = None
-    download_status: str
-    ingest_status: str
-    row_count: int = 0
-
-
-class CreateDatasetRequest(BaseModel):
-    url: str
-
-
-class CreateDatasetResponse(BaseModel):
-    id: str
-    status: str
-
-
-class UpdateDatasetRequest(BaseModel):
-    name: Optional[str] = None
-    fields: Optional[List[FieldDef]] = None
