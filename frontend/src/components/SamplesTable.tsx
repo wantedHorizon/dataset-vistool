@@ -24,7 +24,9 @@ export default function SamplesTable({ rows, onOpenSample, visibleColumns, searc
   const cols = COLUMNS.filter((c) => c.fixed || visible.has(c.key));
 
   return (
-    <TableContainer sx={{ bgcolor: "#fff", borderRadius: 2, border: "1px solid #e2e8f0" }}>
+    <TableContainer
+      sx={{ bgcolor: "background.paper", borderRadius: 2, border: 1, borderColor: "divider" }}
+    >
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>

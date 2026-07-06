@@ -31,22 +31,55 @@ const SPLIT_COLORS: Record<string, "success" | "warning" | "info" | "default"> =
 
 // Wrap every occurrence of the search's \w+ tokens in <mark> so caption matches
 // are visible at a glance. Falls back to plain text when there's nothing to match.
-function highlight(text: string, search?: string): ReactNode {
+function HighlightedText({ text, search }: { text: string; search?: string }) {
   const tokens = (search ?? "").match(/\w+/g);
-  if (!tokens || tokens.length === 0) return text;
+  if (!tokens || tokens.length === 0) return <>{text}</>;
   const pattern = tokens
     .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join("|");
   const re = new RegExp(`(${pattern})`, "gi");
   const parts = text.split(re);
-  return parts.map((part, i) =>
-    re.test(part) && i % 2 === 1 ? (
-      <mark key={i} style={{ background: "#fde68a", padding: 0 }}>
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
+  return (
+    <>
+      {parts.map((part, i) =>
+        re.test(part) && i % 2 === 1 ? (
+          <Box key={i} component="mark" sx={{ bgcolor: "warning.light", p: 0 }}>
+            {part}
+          </Box>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
+function SampleThumbnail({
+  src,
+  alt,
+  onClick,
+}: {
+  src: string;
+  alt: string;
+  onClick: () => void;
+}) {
+  return (
+    <Box
+      component="img"
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onClick={onClick}
+      sx={{
+        width: 110,
+        height: 90,
+        objectFit: "cover",
+        borderRadius: 1.5,
+        cursor: "pointer",
+        bgcolor: "action.hover",
+        display: "block",
+      }}
+    />
   );
 }
 
@@ -73,18 +106,9 @@ export const COLUMNS: ColumnDef[] = [
     width: 130,
     defaultVisible: true,
     render: (row, ctx) => (
-      <img
+      <SampleThumbnail
         src={row.thumb_url}
         alt={row.image_path || `sample_${row.id}`}
-        loading="lazy"
-        style={{
-          width: 110,
-          height: 90,
-          objectFit: "cover",
-          borderRadius: 6,
-          cursor: "pointer",
-          background: "#e2e8f0",
-        }}
         onClick={() => ctx.onOpenSample(row.id)}
       />
     ),
@@ -152,7 +176,7 @@ export const COLUMNS: ColumnDef[] = [
       <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
         {row.captions.map((c, i) => (
           <li key={i} style={{ marginBottom: 2 }}>
-            {highlight(c, ctx.search)}
+            <HighlightedText text={c} search={ctx.search} />
           </li>
         ))}
       </Box>

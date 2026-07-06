@@ -81,6 +81,7 @@ export default function Toolbar({
         color="inherit"
         startIcon={<ViewColumnIcon fontSize="small" />}
         onClick={(e) => setColsAnchor(e.currentTarget)}
+        sx={{ height: 40 }}
       >
         Columns
       </Button>

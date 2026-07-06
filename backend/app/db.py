@@ -6,6 +6,8 @@ import sqlite3
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "flickr8k.db"))
 DB_PATH = os.path.abspath(DB_PATH)
 
+EXPECTED_SPLITS = {"train", "validation", "test"}
+
 
 def get_connection() -> sqlite3.Connection:
     """A normal read/write connection with row access by column name."""
@@ -33,7 +35,10 @@ def db_exists_and_populated() -> bool:
         if cur.fetchone() is None:
             return False
         cur = conn.execute("SELECT COUNT(*) FROM samples")
-        return cur.fetchone()[0] > 0
+        if cur.fetchone()[0] == 0:
+            return False
+        splits = {row[0] for row in conn.execute("SELECT DISTINCT split FROM samples")}
+        return EXPECTED_SPLITS.issubset(splits)
     except sqlite3.Error:
         return False
     finally:

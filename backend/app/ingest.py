@@ -67,7 +67,13 @@ def create_schema(conn: sqlite3.Connection) -> None:
 
 def ingest() -> None:
     if db_exists_and_populated():
-        print(f"[ingest] DB already populated at {DB_PATH}; skipping.")
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            conn.execute("INSERT INTO samples_fts(samples_fts) VALUES('rebuild')")
+            conn.commit()
+        finally:
+            conn.close()
+        print(f"[ingest] DB already populated at {DB_PATH}; FTS index rebuilt.")
         return
 
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -116,11 +122,8 @@ def ingest() -> None:
         conn.commit()
         total += len(rows)
 
-    # Populate the FTS index from the base table.
-    conn.execute(
-        f"INSERT INTO samples_fts(rowid, {', '.join(CAPTION_COLS)}) "
-        f"SELECT id, {', '.join(CAPTION_COLS)} FROM samples"
-    )
+    # Build the FTS index from the external content table (samples).
+    conn.execute("INSERT INTO samples_fts(samples_fts) VALUES('rebuild')")
     conn.commit()
     conn.close()
     print(f"[ingest] Done. Inserted {total} samples into {DB_PATH}")

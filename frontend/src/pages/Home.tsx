@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import ImageSearchIcon from "@mui/icons-material/ImageSearch";
 import Toolbar from "../components/Toolbar";
+import DarkModeToggle from "../components/DarkModeToggle";
 import SamplesTable from "../components/SamplesTable";
 import SampleModal from "../components/SampleModal";
 import SqlConsole from "../components/SqlConsole";
@@ -69,7 +70,12 @@ export default function Home() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-      <AppBar position="static" color="default" elevation={0} sx={{ borderBottom: "1px solid #e2e8f0" }}>
+      <AppBar
+        position="static"
+        color="default"
+        elevation={0}
+        sx={{ borderBottom: 1, borderColor: "divider" }}
+      >
         <MuiToolbar>
           <ImageSearchIcon sx={{ mr: 1 }} />
           <Typography variant="h6" component="div">
@@ -80,6 +86,8 @@ export default function Home() {
               {stats.total} samples
             </Typography>
           )}
+          <Box sx={{ flexGrow: 1 }} />
+          <DarkModeToggle />
         </MuiToolbar>
       </AppBar>
 
