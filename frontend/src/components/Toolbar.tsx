@@ -1,0 +1,73 @@
+import {
+  Box,
+  InputAdornment,
+  MenuItem,
+  TextField,
+  ToggleButton,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import CodeIcon from "@mui/icons-material/Code";
+
+interface Props {
+  split: string;
+  onSplitChange: (v: string) => void;
+  search: string;
+  onSearchChange: (v: string) => void;
+  sqlOpen: boolean;
+  onToggleSql: () => void;
+  splitCounts: Record<string, number>;
+}
+
+export default function Toolbar({
+  split,
+  onSplitChange,
+  search,
+  onSearchChange,
+  sqlOpen,
+  onToggleSql,
+  splitCounts,
+}: Props) {
+  return (
+    <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center", mb: 2 }}>
+      <TextField
+        select
+        size="small"
+        label="Split"
+        value={split}
+        onChange={(e) => onSplitChange(e.target.value)}
+        sx={{ minWidth: 160 }}
+      >
+        <MenuItem value="">All ({Object.values(splitCounts).reduce((a, b) => a + b, 0)})</MenuItem>
+        {Object.entries(splitCounts).map(([name, count]) => (
+          <MenuItem key={name} value={name}>
+            {name} ({count})
+          </MenuItem>
+        ))}
+      </TextField>
+
+      <TextField
+        size="small"
+        placeholder="Search captions…"
+        value={search}
+        onChange={(e) => onSearchChange(e.target.value)}
+        sx={{ minWidth: 260, flex: 1 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon fontSize="small" />
+            </InputAdornment>
+          ),
+        }}
+      />
+
+      <ToggleButton
+        size="small"
+        value="sql"
+        selected={sqlOpen}
+        onChange={onToggleSql}
+      >
+        <CodeIcon fontSize="small" sx={{ mr: 0.5 }} /> SQL
+      </ToggleButton>
+    </Box>
+  );
+}

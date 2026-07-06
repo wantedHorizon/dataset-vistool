@@ -1,0 +1,10 @@
+{
+  "name": "flickr8k-viz-backend",
+  "private": true,
+  "scripts": {
+    "dev": "uvicorn app.main:app --reload --port 8000",
+    "build": "echo 'nothing to build for the backend'",
+    "lint": "echo 'no python linter configured yet'",
+    "test": "pytest"
+  }
+}

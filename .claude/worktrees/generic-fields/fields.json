@@ -1,0 +1,51 @@
+{
+  "dataset": {
+    "name": "flickr8k",
+    "title": "Flickr8k"
+  },
+  "fields": [
+    {
+      "key": "image_path",
+      "label": "Name",
+      "type": "string",
+      "source": "derived",
+      "role": "name",
+      "visible": true,
+      "searchable": false
+    },
+    {
+      "key": "split",
+      "label": "Split",
+      "type": "string",
+      "source": "derived",
+      "role": "split",
+      "visible": true,
+      "searchable": false
+    },
+    {
+      "key": "width",
+      "label": "Width",
+      "type": "integer",
+      "source": "derived",
+      "visible": true,
+      "searchable": false
+    },
+    {
+      "key": "height",
+      "label": "Height",
+      "type": "integer",
+      "source": "derived",
+      "visible": true,
+      "searchable": false
+    },
+    {
+      "key": "captions",
+      "label": "Caption",
+      "type": "string_list",
+      "source": "passthrough",
+      "source_columns": ["caption_0", "caption_1", "caption_2", "caption_3", "caption_4"],
+      "visible": true,
+      "searchable": true
+    }
+  ]
+}
