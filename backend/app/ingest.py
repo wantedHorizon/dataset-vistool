@@ -19,7 +19,7 @@ THUMB_MAX = 256  # longest-edge px for grid thumbnails
 # Parquet files live under this directory (mounted in Docker).
 DATA_DIR = os.environ.get(
     "PARQUET_DIR",
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "flickr8k", "data")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "datasets", "jxie-flickr8k", "data")),
 )
 
 

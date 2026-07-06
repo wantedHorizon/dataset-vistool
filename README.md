@@ -15,14 +15,53 @@ See [`plan.md`](./plan.md) for the full design/build plan.
 - **SQL console** — run arbitrary read-only `SELECT` queries against the SQLite `samples` table
   directly from the UI (image BLOBs are redacted in the response).
 
+## Quick start
+
+The parquet files (~1.1 GB) are not in the repo — download them first, then run.
+
+### Docker (recommended)
+
+```bash
+# 1. Download dataset
+pip install huggingface_hub
+huggingface-cli download jxie/flickr8k --repo-type dataset --local-dir datasets/jxie-flickr8k
+
+# 2. Build and run (DB populates automatically on first backend startup, ~1 min)
+docker compose up --build
+```
+
+- Frontend: http://localhost:8080
+- Backend API: http://localhost:8000/docs (Swagger UI)
+- Stop: `docker compose down`
+- Force re-ingest: `docker compose down -v` then `docker compose up --build`
+
+### Local dev
+
+```bash
+# 1. Download dataset
+pip install huggingface_hub
+huggingface-cli download jxie/flickr8k --repo-type dataset --local-dir datasets/jxie-flickr8k
+
+# 2. Backend venv + populate DB
+cd backend && python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && cd ..
+npm install
+npm run db:populate
+
+# 3. Start dev servers (venv must be active)
+npm run dev
+```
+
+- Frontend: http://localhost:5173 (Vite proxies `/api` to `http://localhost:8000`)
+
 ## Stack
 
 - **Frontend**: React + TypeScript, Vite, MUI 5, styled-components, TanStack React Query,
   React Router, `@uiw/react-json-view`, ESLint.
 - **Backend**: Python, FastAPI, SQLite (stdlib `sqlite3`), Pillow (for thumbnails), pandas/pyarrow
   (to read the source parquet files).
-- **Data**: the `flickr8k/data/*.parquet` files (already present in this repo) are ingested once
-  into a local SQLite DB on first backend startup.
+- **Data**: `datasets/jxie-flickr8k/data/*.parquet` (download separately — see [Quick start](#quick-start)) are ingested
+  once into a local SQLite DB on first backend startup.
 - **Monorepo tooling**: Turborepo orchestrates `frontend`/`backend` as npm workspaces for local
   dev (`npm run dev|build|lint|test` from the repo root). Docker Compose remains the single
   "clone and run" path — Turborepo is a convenience layer on top of it, not a replacement.
@@ -45,62 +84,80 @@ Judgment calls made with a CV researcher's workflow in mind:
 - **Dataset stats (per-split counts)** — a quick sanity check when first loading an unfamiliar
   dataset.
 
-## Run with Docker (recommended)
+## Download the dataset
 
-Requires Docker + Docker Compose.
+Used in [Quick start](#quick-start) above. The files land in `datasets/jxie-flickr8k/data/`.
+
+**Option A — Hugging Face CLI (recommended)**
+
+```bash
+pip install huggingface_hub   # provides huggingface-cli
+huggingface-cli download jxie/flickr8k --repo-type dataset --local-dir datasets/jxie-flickr8k
+```
+
+**Option B — curl (no HF install)**
+
+```bash
+mkdir -p datasets/jxie-flickr8k/data
+BASE=https://huggingface.co/datasets/jxie/flickr8k/resolve/main/data
+for f in \
+  test-00000-of-00001-42a2661d12c73e48.parquet \
+  train-00000-of-00002-2f8f6bfa852eac4b.parquet \
+  train-00001-of-00002-2173151d8cd6c7fb.parquet \
+  validation-00000-of-00001-7025a2b596f14b7b.parquet
+do
+  curl -L -o "datasets/jxie-flickr8k/data/$f" "$BASE/$f"
+done
+```
+
+## Run with Docker
+
+Requires Docker + Docker Compose. Follow the [Quick start](#quick-start) steps, or if the dataset
+is already downloaded:
 
 ```bash
 docker compose up --build
 ```
 
-- Frontend: http://localhost:8080
-- Backend API: http://localhost:8000/docs (Swagger UI)
+On first startup the backend ingests all 8000 samples into a SQLite DB in the `db-data` Docker
+volume (~1 min). Subsequent `up` restarts skip re-ingestion.
 
-The first backend startup ingests all 8000 samples (images + thumbnails) into a SQLite DB stored
-in a named Docker volume (`db-data`), so subsequent restarts skip re-ingestion. Ingestion takes
-about a minute.
+- `docker compose up` — populates the DB on **first** startup (or after a volume wipe)
+- `docker compose down` — stops containers but **keeps** the DB volume
+- `docker compose down -v` — deletes the DB volume; next `up` re-ingests from parquet
 
-To stop:
+## Run locally
 
-```bash
-docker compose down
-```
+Follow the [Quick start](#quick-start) steps above. Additional notes:
 
-(Add `-v` to also delete the ingested SQLite volume, forcing re-ingestion next time.)
+`npm run build` / `npm run lint` / `npm run test` at the root fan out to both workspaces via
+Turborepo. The backend's `dev`/`test` scripts shell out to `uvicorn`/`pytest`, so they require
+the venv to be active — Turborepo does not manage the Python environment.
 
-## Run locally (without Docker)
-
-**Backend** — create the venv and ingest once, first:
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m app.ingest        # one-time: parquet -> backend/data/flickr8k.db
-```
-
-Then, from the repo root, with the backend venv still active in that shell:
-
-```bash
-npm install                 # installs root + frontend + backend workspaces
-npm run dev                 # turbo run dev -> starts uvicorn (backend) + vite (frontend)
-```
-
-Open http://localhost:5173 — Vite proxies `/api` to `http://localhost:8000`.
-
-`npm run build` / `npm run lint` / `npm run test` at the root likewise fan out to both
-workspaces via Turborepo. The backend's `dev`/`test` scripts (`backend/package.json`) just
-shell out to `uvicorn`/`pytest`, so they require the venv above to be active/on `PATH`;
-Turborepo does not manage the Python environment itself.
-
-Alternatively, run each side separately without Turborepo:
+Alternatively, run each side separately:
 
 ```bash
 # terminal 1
 cd backend && uvicorn app.main:app --reload --port 8000
 # terminal 2
 cd frontend && npm install && npm run dev
+```
+
+## Database commands
+
+**Local dev** (from repo root; requires `backend/.venv`):
+
+```bash
+npm run db:populate   # ingest parquet -> SQLite (idempotent)
+npm run db:drop       # delete backend/data/flickr8k.db
+npm run db:drop && npm run db:populate   # force full re-ingest
+```
+
+**Docker** — there is no `npm run db:*` equivalent. To drop and re-populate:
+
+```bash
+docker compose down -v
+docker compose up --build
 ```
 
 ## API overview
@@ -116,9 +173,9 @@ cd frontend && npm install && npm run dev
 ## Project layout
 
 ```
-backend/    FastAPI app, SQLite ingestion, requirements, Dockerfile, package.json (turbo scripts)
-frontend/   React + Vite app, Dockerfile, nginx.conf
-flickr8k/   source parquet dataset (already downloaded)
+backend/              FastAPI app, SQLite ingestion, requirements, Dockerfile, package.json (turbo scripts)
+frontend/             React + Vite app, Dockerfile, nginx.conf
+datasets/jxie-flickr8k/   source parquet dataset (download separately)
 docker-compose.yml
 package.json, turbo.json   root workspace + Turborepo pipeline
 plan.md     design/build plan

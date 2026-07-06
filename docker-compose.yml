@@ -2,7 +2,7 @@ services:
   backend:
     build: ./backend
     volumes:
-      - ./flickr8k/data:/data/flickr8k:ro
+      - ./datasets/jxie-flickr8k/data:/data/parquet:ro
       - db-data:/data/db
     ports:
       - "8000:8000"

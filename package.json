@@ -10,7 +10,9 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "db:populate": "npm run db:populate -w backend",
+    "db:drop": "npm run db:drop -w backend"
   },
   "devDependencies": {
     "turbo": "^2.1.3"
