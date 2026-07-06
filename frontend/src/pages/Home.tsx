@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   AppBar,
@@ -16,6 +16,19 @@ import SampleModal from "../components/SampleModal";
 import SqlConsole from "../components/SqlConsole";
 import { useSamples, useStats } from "../hooks/queries";
 import { useDebounced } from "../hooks/useDebounced";
+import { DEFAULT_VISIBLE } from "../components/tableColumns";
+
+const COLUMNS_STORAGE_KEY = "flickr8k.visibleColumns";
+
+function loadVisibleColumns(): string[] {
+  try {
+    const raw = localStorage.getItem(COLUMNS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as string[];
+  } catch {
+    /* ignore malformed/unavailable storage */
+  }
+  return DEFAULT_VISIBLE;
+}
 
 export default function Home() {
   const [split, setSplit] = useState("");
@@ -25,6 +38,17 @@ export default function Home() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(loadVisibleColumns);
+
+  useEffect(() => {
+    localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  const handleToggleColumn = (key: string) => {
+    setVisibleColumns((cols) =>
+      cols.includes(key) ? cols.filter((c) => c !== key) : [...cols, key],
+    );
+  };
 
   const { data: stats } = useStats();
   const { data, isLoading, isFetching, error } = useSamples({
@@ -68,6 +92,8 @@ export default function Home() {
           sqlOpen={sqlOpen}
           onToggleSql={() => setSqlOpen((v) => !v)}
           splitCounts={stats?.splits ?? {}}
+          visibleColumns={visibleColumns}
+          onToggleColumn={handleToggleColumn}
         />
 
         {sqlOpen && <SqlConsole />}
@@ -81,7 +107,12 @@ export default function Home() {
         ) : data ? (
           <>
             <Box sx={{ opacity: isFetching ? 0.6 : 1, transition: "opacity 0.15s" }}>
-              <SamplesTable rows={data.rows} onOpenSample={setActiveId} />
+              <SamplesTable
+                rows={data.rows}
+                onOpenSample={setActiveId}
+                visibleColumns={visibleColumns}
+                search={search}
+              />
             </Box>
             <TablePagination
               component="div"
