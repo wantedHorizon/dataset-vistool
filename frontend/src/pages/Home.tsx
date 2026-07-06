@@ -18,21 +18,13 @@ import { useDataset, useSamples, useStats } from "../hooks/queries";
 import { useDebounced } from "../hooks/useDebounced";
 import { useDatasetContext } from "../context/DatasetContext";
 import { buildColumns, defaultVisibleKeys, searchableLabels } from "../components/tableColumns";
-
-function loadVisibleColumns(datasetId: string, defaults: string[]): string[] {
-  try {
-    const raw = localStorage.getItem(`explorer.${datasetId}.visibleColumns`);
-    if (raw) return JSON.parse(raw) as string[];
-  } catch {
-    /* ignore */
-  }
-  return defaults;
-}
+import { loadVisibleColumns, saveVisibleColumns } from "../lib/columnStorage";
 
 export default function Home() {
   const { activeDatasetId, ingestedDatasets, isLoading: ctxLoading } = useDatasetContext();
   const { data: schema } = useDataset(activeDatasetId);
   const columns = useMemo(() => (schema ? buildColumns(schema) : []), [schema]);
+  const columnKeys = useMemo(() => columns.map((c) => c.key), [columns]);
   const defaultVisible = useMemo(
     () => (schema ? defaultVisibleKeys(schema) : []),
     [schema],
@@ -48,19 +40,14 @@ export default function Home() {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
 
   useEffect(() => {
-    if (activeDatasetId && defaultVisible.length) {
-      setVisibleColumns(loadVisibleColumns(activeDatasetId, defaultVisible));
-    }
-  }, [activeDatasetId, defaultVisible]);
-
-  useEffect(() => {
-    if (activeDatasetId) {
-      localStorage.setItem(
-        `explorer.${activeDatasetId}.visibleColumns`,
-        JSON.stringify(visibleColumns),
+    if (activeDatasetId && defaultVisible.length && columnKeys.length) {
+      setVisibleColumns(
+        loadVisibleColumns(activeDatasetId, defaultVisible, columnKeys),
       );
+    } else {
+      setVisibleColumns([]);
     }
-  }, [visibleColumns, activeDatasetId]);
+  }, [activeDatasetId, defaultVisible, columnKeys]);
 
   useEffect(() => {
     setSplit("");
@@ -69,9 +56,13 @@ export default function Home() {
   }, [activeDatasetId]);
 
   const handleToggleColumn = (key: string) => {
-    setVisibleColumns((cols) =>
-      cols.includes(key) ? cols.filter((c) => c !== key) : [...cols, key],
-    );
+    setVisibleColumns((cols) => {
+      const next = cols.includes(key) ? cols.filter((c) => c !== key) : [...cols, key];
+      if (activeDatasetId) {
+        saveVisibleColumns(activeDatasetId, next);
+      }
+      return next;
+    });
   };
 
   const sampleParams =

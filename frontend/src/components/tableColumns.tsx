@@ -103,6 +103,30 @@ function renderTextList(row: SampleRecord, field: FieldDef, ctx: CellContext) {
   );
 }
 
+function buildNameColumn(schema: DatasetSchema): ColumnDef {
+  const labelFieldDef = labelField(schema);
+  const sourceKey = labelFieldDef?.name;
+
+  return {
+    key: "name",
+    label: "name",
+    width: 200,
+    defaultVisible: true,
+    render: (row, ctx) => (
+      <Link
+        component="button"
+        underline="hover"
+        onClick={() => ctx.onOpenSample(row.id)}
+        sx={{ textAlign: "left", wordBreak: "break-all", fontWeight: 600 }}
+      >
+        {String(
+          (sourceKey ? row[sourceKey] : null) ?? `sample_${row.id}`,
+        )}
+      </Link>
+    ),
+  };
+}
+
 function fieldToColumn(field: FieldDef, schema: DatasetSchema): ColumnDef | null {
   const labelFieldDef = labelField(schema);
 
@@ -147,23 +171,8 @@ function fieldToColumn(field: FieldDef, schema: DatasetSchema): ColumnDef | null
         render: (row, ctx) => renderTextList(row, field, ctx),
       };
     case "text":
-      if (field.name === "image_path") {
-        return {
-          key: field.name,
-          label: "name",
-          width: 200,
-          defaultVisible: field.visible,
-          render: (row, ctx) => (
-            <Link
-              component="button"
-              underline="hover"
-              onClick={() => ctx.onOpenSample(row.id)}
-              sx={{ textAlign: "left", wordBreak: "break-all", fontWeight: 600 }}
-            >
-              {String(row[field.name] ?? `sample_${row.id}`)}
-            </Link>
-          ),
-        };
+      if (field.name === "image_path" || field.name === "name") {
+        return null;
       }
       return {
         key: field.name,
@@ -187,16 +196,31 @@ function fieldToColumn(field: FieldDef, schema: DatasetSchema): ColumnDef | null
   }
 }
 
+const PREFERRED_DEFAULT_KEYS = ["name", "id", "image", "captions"] as const;
+
+function reorderColumns(cols: ColumnDef[]): ColumnDef[] {
+  const fixed = cols.filter((c) => c.fixed);
+  const rest = cols.filter((c) => !c.fixed);
+  const byKey = new Map(rest.map((c) => [c.key, c]));
+  const preferred = PREFERRED_DEFAULT_KEYS.flatMap((key) => {
+    const col = byKey.get(key);
+    return col ? [col] : [];
+  });
+  const preferredSet = new Set(PREFERRED_DEFAULT_KEYS);
+  const remaining = rest.filter((c) => !preferredSet.has(c.key as (typeof PREFERRED_DEFAULT_KEYS)[number]));
+  return [...preferred, ...remaining, ...fixed];
+}
+
 export function buildColumns(schema: DatasetSchema): ColumnDef[] {
-  const cols: ColumnDef[] = [
-    {
-      key: "id",
-      label: "id",
-      width: 70,
-      defaultVisible: true,
-      render: (row) => row.id,
-    },
-  ];
+  const cols: ColumnDef[] = [buildNameColumn(schema)];
+
+  cols.push({
+    key: "id",
+    label: "id",
+    width: 70,
+    defaultVisible: true,
+    render: (row) => row.id,
+  });
 
   for (const field of schema.fields) {
     if (field.type === "blob") continue;
@@ -254,13 +278,12 @@ export function buildColumns(schema: DatasetSchema): ColumnDef[] {
     ),
   });
 
-  return cols;
+  return reorderColumns(cols);
 }
 
 export function defaultVisibleKeys(schema: DatasetSchema): string[] {
-  return buildColumns(schema)
-    .filter((c) => c.fixed || c.defaultVisible)
-    .map((c) => c.key);
+  const available = new Set(buildColumns(schema).map((c) => c.key));
+  return PREFERRED_DEFAULT_KEYS.filter((key) => available.has(key));
 }
 
 export function searchableLabels(schema: DatasetSchema): string {

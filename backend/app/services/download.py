@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 from huggingface_hub import HfApi, hf_hub_download, snapshot_download
+from huggingface_hub.utils import disable_progress_bars
 
 from app.models.dataset import DatasetSchema, DownloadStatus, SourceConfig, SplitConfig
 from app.schema_extraction.card_mapper import extract_schema
@@ -98,6 +99,9 @@ def _apply_extract_result(dataset_id: str, result, parquet_subdir: str, dest: st
 
 
 def _download_worker(dataset_id: str, repo_id: str, dest: str) -> None:
+    # HF hub uses tqdm internally; disable in this background thread to avoid
+    # AttributeError: type object 'tqdm' has no attribute '_lock'.
+    disable_progress_bars()
     try:
         api = HfApi()
         update_download_status(
@@ -140,7 +144,6 @@ def _download_worker(dataset_id: str, repo_id: str, dest: str) -> None:
                     filename=readme_name,
                     repo_type="dataset",
                     local_dir=dest,
-                    local_dir_use_symlinks=False,
                 )
                 readme_path = os.path.join(dest, readme_name)
                 if os.path.exists(readme_path):
@@ -180,7 +183,6 @@ def _download_worker(dataset_id: str, repo_id: str, dest: str) -> None:
             repo_type="dataset",
             local_dir=dest,
             allow_patterns=["**/*.parquet"],
-            local_dir_use_symlinks=False,
         )
 
         schema = load_schema(dataset_id)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DatasetSchema } from "../api/client";
-import { defaultVisibleKeys } from "./tableColumns";
+import { buildColumns, defaultVisibleKeys } from "./tableColumns";
 
 /** Fixture matching Flickr8k fields after card_mapper post-process. */
 const flickr8kSchema: DatasetSchema = {
@@ -83,11 +83,26 @@ const flickr8kSchema: DatasetSchema = {
 };
 
 describe("defaultVisibleKeys", () => {
-  it("includes id, name (image_path), image, and captions for Flickr8k", () => {
-    const keys = defaultVisibleKeys(flickr8kSchema);
-    expect(keys).toContain("id");
-    expect(keys).toContain("image_path");
-    expect(keys).toContain("image");
-    expect(keys).toContain("captions");
+  it("returns name, id, image, captions in order for Flickr8k", () => {
+    expect(defaultVisibleKeys(flickr8kSchema)).toEqual(["name", "id", "image", "captions"]);
+    expect(defaultVisibleKeys(flickr8kSchema)).not.toContain("split");
+    expect(defaultVisibleKeys(flickr8kSchema)).not.toContain("image_path");
+  });
+});
+
+describe("buildColumns", () => {
+  it("orders preferred columns before split and actions", () => {
+    const keys = buildColumns(flickr8kSchema).map((c) => c.key);
+    expect(keys.slice(0, 4)).toEqual(["name", "id", "image", "captions"]);
+    expect(keys[keys.length - 1]).toBe("actions");
+  });
+
+  it("includes name column when schema has no image_path field", () => {
+    const schemaWithoutPath: DatasetSchema = {
+      ...flickr8kSchema,
+      fields: flickr8kSchema.fields.filter((f) => f.name !== "image_path"),
+    };
+    expect(defaultVisibleKeys(schemaWithoutPath)).toEqual(["name", "id", "image", "captions"]);
+    expect(buildColumns(schemaWithoutPath).some((c) => c.key === "name")).toBe(true);
   });
 });
