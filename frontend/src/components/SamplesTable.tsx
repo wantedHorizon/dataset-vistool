@@ -6,22 +6,21 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
-import { Sample } from "../api/client";
-import { COLUMNS } from "./tableColumns";
+import { SampleRecord } from "../api/client";
+import { ColumnDef, CellContext } from "./tableColumns";
 
 interface Props {
-  rows: Sample[];
+  rows: SampleRecord[];
+  columns: ColumnDef[];
   onOpenSample: (id: number) => void;
   visibleColumns: string[];
   search?: string;
 }
 
-// "Viewer" mode, styled after the Hugging Face dataset viewer. Columns are
-// driven by the catalog in tableColumns.tsx and filtered to the user's
-// selection; clicking a thumbnail/name/JSON icon opens the JSON modal.
-export default function SamplesTable({ rows, onOpenSample, visibleColumns, search }: Props) {
+export default function SamplesTable({ rows, columns, onOpenSample, visibleColumns, search }: Props) {
   const visible = new Set(visibleColumns);
-  const cols = COLUMNS.filter((c) => c.fixed || visible.has(c.key));
+  const cols = columns.filter((c) => c.fixed || visible.has(c.key));
+  const ctx: CellContext = { onOpenSample, search };
 
   return (
     <TableContainer
@@ -41,7 +40,7 @@ export default function SamplesTable({ rows, onOpenSample, visibleColumns, searc
           {rows.map((row) => (
             <TableRow hover key={row.id}>
               {cols.map((c) => (
-                <TableCell key={c.key}>{c.render(row, { onOpenSample, search })}</TableCell>
+                <TableCell key={c.key}>{c.render(row, ctx)}</TableCell>
               ))}
             </TableRow>
           ))}

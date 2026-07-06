@@ -15,14 +15,14 @@ import {
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { useSql } from "../hooks/queries";
+import { useDatasetContext } from "../context/DatasetContext";
 
-const EXAMPLE = "SELECT id, split, image_path, caption_0 FROM samples LIMIT 20;";
+const EXAMPLE = "SELECT id, split, image_path FROM samples LIMIT 20;";
 
-// Read-only SQL query console. BLOB columns (image/thumbnail) come back redacted
-// from the backend, so this is safe to expose directly to the user.
 export default function SqlConsole() {
+  const { activeDatasetId } = useDatasetContext();
   const [query, setQuery] = useState(EXAMPLE);
-  const { mutate, data, error, isPending } = useSql();
+  const { mutate, data, error, isPending } = useSql(activeDatasetId);
 
   return (
     <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
@@ -41,7 +41,7 @@ export default function SqlConsole() {
         variant="contained"
         size="small"
         startIcon={<PlayArrowIcon />}
-        disabled={isPending}
+        disabled={isPending || !activeDatasetId}
         onClick={() => mutate(query)}
       >
         Run

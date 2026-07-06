@@ -7,9 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-# parquet data and the sqlite data dir are mounted as volumes (see docker-compose.yml)
+# Registry, downloaded datasets, and SQLite DBs live under /app/data (mounted volume)
 ENV PARQUET_DIR=/data/parquet
-ENV DB_PATH=/data/db/flickr8k.db
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

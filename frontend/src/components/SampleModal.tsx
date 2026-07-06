@@ -1,6 +1,7 @@
 import { Box, CircularProgress, Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useSample } from "../hooks/queries";
+import { useDatasetContext } from "../context/DatasetContext";
 import JsonViewer from "./JsonViewer";
 
 interface Props {
@@ -8,26 +9,32 @@ interface Props {
   onClose: () => void;
 }
 
-// Full sample detail (image + JSON) shown in a modal. Only one instance is ever
-// rendered, so "only one open at a time" is structural rather than state-tracked.
 export default function SampleModal({ id, onClose }: Props) {
+  const { activeDatasetId } = useDatasetContext();
   const open = id !== null;
-  const { data, isLoading, error } = useSample(id);
+  const { data, isLoading, error } = useSample(activeDatasetId, id);
+
+  const title =
+    data && (data.image_path ?? data.name)
+      ? String(data.image_path ?? data.name)
+      : id !== null
+        ? `sample_${id}`
+        : "Sample";
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        {data ? data.image_path || `sample_${data.id}` : "Sample"}
+        {title}
         <IconButton onClick={onClose} size="small">
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
       <DialogContent dividers>
         <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-          {id !== null && (
+          {data?.image_url && (
             <Box sx={{ flexShrink: 0 }}>
               <img
-                src={`/api/images/${id}`}
+                src={String(data.image_url)}
                 alt={`sample ${id}`}
                 style={{ maxWidth: 280, maxHeight: 280, borderRadius: 8, display: "block" }}
               />

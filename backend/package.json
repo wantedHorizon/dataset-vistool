@@ -7,6 +7,6 @@
     "lint": "echo 'no python linter configured yet'",
     "test": "pytest",
     "db:populate": ".venv/bin/python -m app.ingest",
-    "db:drop": "rm -f data/flickr8k.db"
+    "db:drop": "rm -rf data/registry.json data/datasets data/flickr8k.db"
   }
 }

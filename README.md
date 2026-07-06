@@ -1,17 +1,23 @@
-# Flickr8k Dataset Explorer
+# Dataset Explorer
 
-A local web tool for browsing, searching, and inspecting the [Flickr8k](https://huggingface.co/datasets/jxie/flickr8k)
-image-captioning dataset (8000 images, 5 human captions each).
+A local web tool for browsing, searching, and inspecting HuggingFace datasets — starting with
+[Flickr8k](https://huggingface.co/datasets/jxie/flickr8k) (8000 images, 5 human captions each).
+
+Add any HuggingFace parquet dataset by URL: the app downloads it, parses the README for field
+structure, lets you edit field types and visibility, then ingests into SQLite for fast browse/search.
 
 See [`plan.md`](./plan.md) for the full design/build plan.
 
 ## Features
 
-- **Gallery/table view** — paginated grid of thumbnails + captions, à la the HF dataset viewer.
+- **Add datasets by URL** — paste a HuggingFace dataset link; parquet + README are downloaded automatically.
+- **Schema editor** — review fields parsed from the dataset README; set types, table visibility, and searchability.
+- **Gallery/table view** — paginated grid of thumbnails + fields, à la the HF dataset viewer.
+- **Dataset selector** — switch between ingested datasets on the browse page.
 - **JSON detail modal** — click a thumbnail, filename, or the JSON icon to open a modal with
   the full-resolution image and an interactive, collapsible JSON tree for that sample.
-- **Search** — full-text search across all 5 captions (SQLite FTS5), paginated and debounced.
-- **Split filter** — filter by `train` / `validation` / `test`.
+- **Search** — full-text search across searchable fields (SQLite FTS5), paginated and debounced.
+- **Split filter** — filter by train / validation / test (when splits are present).
 - **SQL console** — run arbitrary read-only `SELECT` queries against the SQLite `samples` table
   directly from the UI (image BLOBs are redacted in the response).
 
@@ -22,18 +28,18 @@ The parquet files (~1.1 GB) are not in the repo — download them first, then ru
 ### Docker (recommended)
 
 ```bash
-# 1. Download dataset
+# Optional: pre-download Flickr8k for faster first boot (otherwise use Add Dataset in the UI)
 pip install huggingface_hub
 huggingface-cli download jxie/flickr8k --repo-type dataset --local-dir datasets/jxie-flickr8k
 
-# 2. Build and run (DB populates automatically on first backend startup, ~1 min)
 docker compose up --build
 ```
 
-- Frontend: http://localhost:8080
+- Frontend: http://localhost:8080 — use **Add Dataset** to paste a HuggingFace URL, edit the schema, then **Import data**
 - Backend API: http://localhost:8000/docs (Swagger UI)
+- Optional `HF_TOKEN` env for gated datasets
 - Stop: `docker compose down`
-- Force re-ingest: `docker compose down -v` then `docker compose up --build`
+- Reset all data: `docker compose down -v` then `docker compose up --build`
 
 ### Local dev
 

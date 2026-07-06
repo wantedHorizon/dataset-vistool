@@ -1,11 +1,9 @@
-/* eslint-disable react-refresh/only-export-components -- column catalog module: exports data + cell renderers, not React components */
+/* eslint-disable react-refresh/only-export-components */
 import { ReactNode } from "react";
 import { Box, Chip, IconButton, Link, Tooltip } from "@mui/material";
 import DataObjectIcon from "@mui/icons-material/DataObject";
-import { Sample } from "../api/client";
+import { DatasetSchema, FieldDef, SampleRecord } from "../api/client";
 
-// Context handed to each column's cell renderer. `search` is the active,
-// debounced caption query, used to highlight matched tokens in the captions cell.
 export interface CellContext {
   onOpenSample: (id: number) => void;
   search?: string;
@@ -15,12 +13,9 @@ export interface ColumnDef {
   key: string;
   label: string;
   width?: number;
-  // Non-toggleable columns (e.g. the JSON action) never appear in the picker
-  // and are always rendered.
   fixed?: boolean;
-  // Whether the column is visible by default when no saved preference exists.
   defaultVisible?: boolean;
-  render: (row: Sample, ctx: CellContext) => ReactNode;
+  render: (row: SampleRecord, ctx: CellContext) => ReactNode;
 }
 
 const SPLIT_COLORS: Record<string, "success" | "warning" | "info" | "default"> = {
@@ -29,8 +24,6 @@ const SPLIT_COLORS: Record<string, "success" | "warning" | "info" | "default"> =
   test: "info",
 };
 
-// Wrap every occurrence of the search's \w+ tokens in <mark> so caption matches
-// are visible at a glance. Falls back to plain text when there's nothing to match.
 function HighlightedText({ text, search }: { text: string; search?: string }) {
   const tokens = (search ?? "").match(/\w+/g);
   if (!tokens || tokens.length === 0) return <>{text}</>;
@@ -89,107 +82,165 @@ function aspectLabel(w: number, h: number): string {
   return r > 1 ? "landscape" : "portrait";
 }
 
-// The full column catalog. `SamplesTable` renders the subset the user has
-// enabled; `ColumnsMenu` lists the toggleable ones. Add a column here and it
-// shows up in both places automatically.
-export const COLUMNS: ColumnDef[] = [
-  {
-    key: "id",
-    label: "id",
-    width: 70,
-    defaultVisible: false,
-    render: (row) => row.id,
-  },
-  {
-    key: "image",
-    label: "image",
-    width: 130,
-    defaultVisible: true,
-    render: (row, ctx) => (
-      <SampleThumbnail
-        src={row.thumb_url}
-        alt={row.image_path || `sample_${row.id}`}
-        onClick={() => ctx.onOpenSample(row.id)}
-      />
-    ),
-  },
+function labelField(schema: DatasetSchema): FieldDef | undefined {
+  return (
+    schema.fields.find((f) => f.name === "image_path") ??
+    schema.fields.find((f) => f.type === "text" && f.visible)
+  );
+}
 
-  {
-    key: "name",
-    label: "name",
-    width: 200,
-    defaultVisible: true,
-    render: (row, ctx) => (
-      <Link
-        component="button"
-        underline="hover"
-        onClick={() => ctx.onOpenSample(row.id)}
-        sx={{ textAlign: "left", wordBreak: "break-all", fontWeight: 600 }}
-      >
-        {row.image_path || `sample_${row.id}`}
-      </Link>
-    ),
-  },
-  {
-    key: "split",
-    label: "split",
-    width: 120,
-    defaultVisible: true,
-    render: (row) => (
-      <Chip
-        label={row.split}
-        size="small"
-        color={SPLIT_COLORS[row.split] ?? "default"}
-        variant="outlined"
-      />
-    ),
-  },
-  {
-    key: "dimensions",
-    label: "dimensions",
-    width: 120,
-    defaultVisible: false,
-    render: (row) =>
-      row.width && row.height ? (
-        <Chip label={`${row.width}×${row.height}`} size="small" variant="outlined" />
-      ) : (
-        "—"
-      ),
-  },
-  {
-    key: "aspect",
-    label: "aspect",
-    width: 120,
-    defaultVisible: false,
-    render: (row) =>
-      row.width && row.height ? (
-        <Chip label={aspectLabel(row.width, row.height)} size="small" variant="outlined" />
-      ) : (
-        "—"
-      ),
-  },
-  {
-    key: "captions",
-    label: "captions",
-    defaultVisible: true,
-    render: (row, ctx) => (
-      <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
-        {row.captions.map((c, i) => (
-          <li key={i} style={{ marginBottom: 2 }}>
-            <HighlightedText text={c} search={ctx.search} />
-          </li>
-        ))}
-      </Box>
-    ),
-  },
-  {
-    key: "caption_count",
-    label: "# captions",
-    width: 90,
-    defaultVisible: false,
-    render: (row) => row.captions.length,
-  },
-  {
+function renderTextList(row: SampleRecord, field: FieldDef, ctx: CellContext) {
+  const items = row[field.name];
+  if (!Array.isArray(items)) return "—";
+  return (
+    <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
+      {items.map((c, i) => (
+        <li key={i} style={{ marginBottom: 2 }}>
+          <HighlightedText text={String(c)} search={ctx.search} />
+        </li>
+      ))}
+    </Box>
+  );
+}
+
+function fieldToColumn(field: FieldDef, schema: DatasetSchema): ColumnDef | null {
+  const labelFieldDef = labelField(schema);
+
+  switch (field.type) {
+    case "image":
+      return {
+        key: field.name,
+        label: field.name,
+        width: 130,
+        defaultVisible: field.visible,
+        render: (row, ctx) =>
+          row.thumb_url ? (
+            <SampleThumbnail
+              src={String(row.thumb_url)}
+              alt={String(row[labelFieldDef?.name ?? "id"] ?? `sample_${row.id}`)}
+              onClick={() => ctx.onOpenSample(row.id)}
+            />
+          ) : (
+            "—"
+          ),
+      };
+    case "split":
+      return {
+        key: field.name,
+        label: field.name,
+        width: 120,
+        defaultVisible: field.visible,
+        render: (row) => (
+          <Chip
+            label={String(row.split ?? "—")}
+            size="small"
+            color={SPLIT_COLORS[String(row.split)] ?? "default"}
+            variant="outlined"
+          />
+        ),
+      };
+    case "text_list":
+      return {
+        key: field.name,
+        label: field.name,
+        defaultVisible: field.visible,
+        render: (row, ctx) => renderTextList(row, field, ctx),
+      };
+    case "text":
+      if (field.name === "image_path") {
+        return {
+          key: field.name,
+          label: "name",
+          width: 200,
+          defaultVisible: field.visible,
+          render: (row, ctx) => (
+            <Link
+              component="button"
+              underline="hover"
+              onClick={() => ctx.onOpenSample(row.id)}
+              sx={{ textAlign: "left", wordBreak: "break-all", fontWeight: 600 }}
+            >
+              {String(row[field.name] ?? `sample_${row.id}`)}
+            </Link>
+          ),
+        };
+      }
+      return {
+        key: field.name,
+        label: field.name,
+        defaultVisible: field.visible,
+        render: (row, ctx) => (
+          <HighlightedText text={String(row[field.name] ?? "—")} search={ctx.search} />
+        ),
+      };
+    case "integer":
+      if (field.name === "width" || field.name === "height") return null;
+      return {
+        key: field.name,
+        label: field.name,
+        width: 100,
+        defaultVisible: field.visible,
+        render: (row) => String(row[field.name] ?? "—"),
+      };
+    default:
+      return null;
+  }
+}
+
+export function buildColumns(schema: DatasetSchema): ColumnDef[] {
+  const cols: ColumnDef[] = [
+    {
+      key: "id",
+      label: "id",
+      width: 70,
+      defaultVisible: false,
+      render: (row) => row.id,
+    },
+  ];
+
+  for (const field of schema.fields) {
+    if (field.type === "blob") continue;
+    const col = fieldToColumn(field, schema);
+    if (col) cols.push(col);
+  }
+
+  // Derived dimension columns when width/height present in data
+  const hasDims = schema.fields.some((f) => f.name === "width") ||
+    schema.fields.some((f) => f.type === "image");
+  if (hasDims) {
+    cols.push(
+      {
+        key: "dimensions",
+        label: "dimensions",
+        width: 120,
+        defaultVisible: false,
+        render: (row) =>
+          row.width && row.height ? (
+            <Chip label={`${row.width}×${row.height}`} size="small" variant="outlined" />
+          ) : (
+            "—"
+          ),
+      },
+      {
+        key: "aspect",
+        label: "aspect",
+        width: 120,
+        defaultVisible: false,
+        render: (row) =>
+          row.width && row.height ? (
+            <Chip
+              label={aspectLabel(Number(row.width), Number(row.height))}
+              size="small"
+              variant="outlined"
+            />
+          ) : (
+            "—"
+          ),
+      },
+    );
+  }
+
+  cols.push({
     key: "actions",
     label: "",
     width: 56,
@@ -201,9 +252,22 @@ export const COLUMNS: ColumnDef[] = [
         </IconButton>
       </Tooltip>
     ),
-  },
-];
+  });
 
-export const DEFAULT_VISIBLE = COLUMNS.filter(
-  (c) => c.fixed || c.defaultVisible,
-).map((c) => c.key);
+  return cols;
+}
+
+export function defaultVisibleKeys(schema: DatasetSchema): string[] {
+  return buildColumns(schema)
+    .filter((c) => c.fixed || c.defaultVisible)
+    .map((c) => c.key);
+}
+
+export function searchableLabels(schema: DatasetSchema): string {
+  const labels = schema.fields.filter((f) => f.searchable).map((f) => f.name);
+  return labels.length ? labels.join(", ") : "fields";
+}
+
+// Legacy export for any remaining imports
+export const COLUMNS: ColumnDef[] = [];
+export const DEFAULT_VISIBLE: string[] = [];

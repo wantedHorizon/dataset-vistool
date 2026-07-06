@@ -1,25 +1,29 @@
 """Pydantic response/request models."""
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
+from .dataset_schema import (
+    CreateDatasetRequest,
+    CreateDatasetResponse,
+    DatasetSchema,
+    DatasetSummary,
+    DownloadStatus,
+    FieldDef,
+    UpdateDatasetRequest,
+)
 
-class Sample(BaseModel):
+
+class SampleRecord(BaseModel):
     id: int
-    split: str
-    image_path: Optional[str]
-    captions: List[str]
-    width: Optional[int]
-    height: Optional[int]
-    image_url: str
-    thumb_url: str
+    data: Dict[str, Any]
 
 
 class SamplesPage(BaseModel):
     total: int
     page: int
     page_size: int
-    rows: List[Sample]
+    rows: List[Dict[str, Any]]
 
 
 class Stats(BaseModel):
@@ -35,3 +39,12 @@ class SqlResponse(BaseModel):
     columns: List[str]
     rows: List[List[Any]]
     row_count: int
+
+
+class ActiveDatasetResponse(BaseModel):
+    id: Optional[str]
+
+
+class ReparseResponse(BaseModel):
+    fields: List[FieldDef]
+    warnings: List[str]

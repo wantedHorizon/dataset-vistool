@@ -13,7 +13,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import CodeIcon from "@mui/icons-material/Code";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
-import { COLUMNS } from "./tableColumns";
+import { ColumnDef } from "./tableColumns";
 
 interface Props {
   split: string;
@@ -25,6 +25,8 @@ interface Props {
   splitCounts: Record<string, number>;
   visibleColumns: string[];
   onToggleColumn: (key: string) => void;
+  columns: ColumnDef[];
+  searchPlaceholder?: string;
 }
 
 export default function Toolbar({
@@ -37,10 +39,12 @@ export default function Toolbar({
   splitCounts,
   visibleColumns,
   onToggleColumn,
+  columns,
+  searchPlaceholder = "Search…",
 }: Props) {
   const [colsAnchor, setColsAnchor] = useState<null | HTMLElement>(null);
   const visible = new Set(visibleColumns);
-  const toggleable = COLUMNS.filter((c) => !c.fixed);
+  const toggleable = columns.filter((c) => !c.fixed);
 
   return (
     <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center", mb: 2 }}>
@@ -62,7 +66,7 @@ export default function Toolbar({
 
       <TextField
         size="small"
-        placeholder="Search captions…"
+        placeholder={searchPlaceholder}
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         sx={{ minWidth: 260, flex: 1 }}
@@ -94,12 +98,7 @@ export default function Toolbar({
         ))}
       </Menu>
 
-      <ToggleButton
-        size="small"
-        value="sql"
-        selected={sqlOpen}
-        onChange={onToggleSql}
-      >
+      <ToggleButton size="small" value="sql" selected={sqlOpen} onChange={onToggleSql}>
         <CodeIcon fontSize="small" sx={{ mr: 0.5 }} /> SQL
       </ToggleButton>
     </Box>
