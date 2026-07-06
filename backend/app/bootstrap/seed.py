@@ -19,9 +19,11 @@ def flickr8k_default_fields() -> list[FieldDef]:
     from app.schema_extraction.card_mapper import extract_from_yaml_metadata, map_dataset_info
     from app.schema_extraction.md_parser import parse_yaml_frontmatter
 
-    readme_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "datasets", "jxie-flickr8k", "README.md"
-    )
+    readme_path = os.path.join(os.path.dirname(LEGACY_PARQUET_DIR), "README.md")
+    if not os.path.exists(readme_path):
+        readme_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "datasets", "jxie-flickr8k", "README.md"
+        )
     if os.path.exists(readme_path):
         with open(readme_path, encoding="utf-8") as f:
             metadata = parse_yaml_frontmatter(f.read())

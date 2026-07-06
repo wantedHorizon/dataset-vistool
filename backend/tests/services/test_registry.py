@@ -72,7 +72,7 @@ def test_drop_all_data_clears_everything(isolated_data_root, monkeypatch):
     reg.drop_all_data()
 
     assert not (isolated_data_root / "registry.json").exists()
-    assert not (isolated_data_root / "datasets").exists()
+    assert (isolated_data_root / "datasets").is_dir()
     assert not legacy.exists()
 
 

@@ -31,7 +31,63 @@ See [`plan.md`](./plan.md) for the full design/build plan.
 
 Parquet files are not in the repo — download separately or use **Add Dataset** in the UI.
 
-### Docker (recommended)
+### Run without Docker
+
+**Prerequisites:** Python 3.9+, Node.js 18+, npm.
+
+**1. One-time setup** (from repo root):
+
+```bash
+# Optional: pre-download Flickr8k so first boot seeds a dataset immediately
+pip install huggingface_hub
+huggingface-cli download jxie/flickr8k --repo-type dataset --local-dir datasets/jxie-flickr8k
+
+# Python backend
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cd ..
+
+# Frontend + Turborepo
+npm install
+```
+
+**2. Start dev servers** (from repo root, with the backend venv active):
+
+```bash
+source backend/.venv/bin/activate    # required — turbo invokes uvicorn from your PATH
+npm run dev
+```
+
+- App: http://localhost:5173 (Vite dev server; `/api` proxied to the backend)
+- API docs: http://localhost:8000/docs
+
+**Alternative — two terminals** (no need to keep venv active in the frontend terminal):
+
+```bash
+# Terminal 1 — backend
+cd backend && source .venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 — frontend
+cd frontend && npm run dev
+```
+
+On first startup the backend creates `backend/data/`, seeds Flickr8k if `datasets/jxie-flickr8k/data/` exists, and ingests any pending datasets. To add more datasets without pre-downloading parquet, open http://localhost:5173/datasets/new and paste a HuggingFace URL.
+
+**Reset / re-ingest** (venv active, from repo root; **dev-only** — requires `backend/.venv`):
+
+```bash
+npm run db:drop       # wipe all datasets
+npm run db:populate   # re-seed registry + re-ingest from parquet
+```
+
+In Docker, reset data with `docker compose down -v && docker compose up --build` (the backend image has no `.venv`, so `db:drop`/`db:populate` do not apply there).
+
+**Gated HuggingFace datasets:** set `HF_TOKEN` in your shell before starting the backend.
+
+### Docker
 
 ```bash
 # Optional: pre-download Flickr8k for faster first boot
@@ -47,20 +103,6 @@ docker compose up --build
 - Data volume: `explorer-data` → `/app/data` in the backend container
 - Stop: `docker compose down`
 - **Reset all data**: `docker compose down -v` then `docker compose up --build`
-
-### Local dev
-
-```bash
-pip install huggingface_hub
-huggingface-cli download jxie/flickr8k --repo-type dataset --local-dir datasets/jxie-flickr8k
-
-cd backend && python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && cd ..
-npm install
-npm run dev   # backend venv must be active for ingest on startup
-```
-
-- Frontend: http://localhost:5173 (proxies `/api` → `http://localhost:8000`)
 
 ## Data layout
 
@@ -79,14 +121,17 @@ Pre-downloaded parquet for local dev can also live at `datasets/jxie-flickr8k/da
 
 ## Database commands
 
-From repo root (requires `backend/.venv`):
+From repo root (**dev-only** — requires `backend/.venv`; not available inside the Docker backend image):
 
 ```bash
 npm run db:drop       # wipe registry + all datasets (schemas, sources, SQLite DBs)
-npm run db:populate   # re-ingest registered datasets from parquet (idempotent)
+npm run db:populate   # re-seed Flickr8k when empty, then re-ingest from parquet
 ```
 
+Docker reset: `docker compose down -v && docker compose up --build` (drops the `explorer-data` volume).
+
 `db:drop` runs `python -m app.registry_cli drop` — removes everything under the new multi-dataset layout plus legacy `flickr8k.db`.
+`db:populate` runs `python -m app.registry_cli populate` — calls `init_registry()` then ingests pending datasets.
 
 **Docker** — reset via volume wipe (no `npm run db:*` inside the container):
 
@@ -97,7 +142,7 @@ docker compose up --build
 
 ## Delete a single dataset
 
-- **UI**: Schema editor → **Delete dataset** (removes schema, source files, and `{id}.db`)
+- **UI**: Datasets page (`/datasets`) or schema editor during setup → **Delete**
 - **API**: `DELETE /api/datasets/{id}`
 
 ## API overview

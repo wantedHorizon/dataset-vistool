@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import AppLayout from "../components/AppLayout";
 import { useCreateDataset, useDownloadStatus } from "../hooks/queries";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 
 export default function AddDataset() {
   const [url, setUrl] = useState("https://huggingface.co/datasets/jxie/flickr8k");
@@ -22,6 +23,7 @@ export default function AddDataset() {
     datasetId,
     datasetId !== null && create.isSuccess,
   );
+  const guardDialog = useNavigationGuard(status?.status === "fetching_metadata");
 
   useEffect(() => {
     if (
@@ -46,6 +48,7 @@ export default function AddDataset() {
 
   return (
     <AppLayout>
+      {guardDialog}
       <Container maxWidth="sm" sx={{ py: 4 }}>
         <Typography variant="h5" gutterBottom>
           Add Dataset

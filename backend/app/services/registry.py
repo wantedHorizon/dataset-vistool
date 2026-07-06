@@ -155,7 +155,7 @@ def drop_all_data() -> None:
     if os.path.exists(REGISTRY_PATH):
         os.remove(REGISTRY_PATH)
 
-    os.makedirs(DATA_ROOT, exist_ok=True)
+    _ensure_dirs()
 
 
 def update_download_status(

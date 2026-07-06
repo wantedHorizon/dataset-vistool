@@ -2,10 +2,10 @@ services:
   backend:
     build: ./backend
     volumes:
-      - ./datasets/jxie-flickr8k/data:/data/parquet:ro
+      - ./datasets/jxie-flickr8k:/data/flickr8k:ro
       - explorer-data:/app/data
     environment:
-      PARQUET_DIR: /data/parquet
+      PARQUET_DIR: /data/flickr8k/data
       HF_TOKEN: ${HF_TOKEN:-}
     ports:
       - "8000:8000"

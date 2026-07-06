@@ -193,7 +193,7 @@ export function buildColumns(schema: DatasetSchema): ColumnDef[] {
       key: "id",
       label: "id",
       width: 70,
-      defaultVisible: false,
+      defaultVisible: true,
       render: (row) => row.id,
     },
   ];

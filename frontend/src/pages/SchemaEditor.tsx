@@ -38,6 +38,7 @@ import {
   useTriggerIngest,
   useUpdateDataset,
 } from "../hooks/queries";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 
 const FIELD_TYPES: FieldType[] = ["text", "text_list", "image", "integer", "split", "blob"];
 
@@ -96,6 +97,9 @@ export default function SchemaEditor() {
   const fieldRows = useMemo(() => buildFieldRows(fields), [fields]);
   const download = downloadStatus ?? schema?.download;
   const downloadReady = download?.status === "ready";
+  const downloadInProgress =
+    download?.status === "downloading" || download?.status === "schema_ready";
+  const guardDialog = useNavigationGuard(downloadInProgress);
   const showDownloadPanel =
     download && !["ready", "idle"].includes(download.status) && schema?.ingest.status !== "done";
 
@@ -120,7 +124,7 @@ export default function SchemaEditor() {
   const handleDelete = async () => {
     await remove.mutateAsync(id);
     setDeleteOpen(false);
-    navigate("/datasets/new");
+    navigate("/datasets");
   };
 
   const updateField = (index: number, patch: Partial<FieldDef>) => {
@@ -135,6 +139,7 @@ export default function SchemaEditor() {
 
   return (
     <AppLayout>
+      {guardDialog}
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {isLoading && (
           <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -167,6 +172,11 @@ export default function SchemaEditor() {
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               {schema.source_url}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Configure how fields appear in the browse table (visibility, types, search). This
+              does not change the source parquet — delete and re-add the dataset to change source
+              data.
             </Typography>
 
             <Grid container spacing={3}>
@@ -261,7 +271,7 @@ export default function SchemaEditor() {
                 onClick={handleIngest}
                 disabled={ingestRunning || fields.length === 0 || !downloadReady}
               >
-                {ingestRunning ? "Importing…" : "Import data"}
+                {ingestRunning ? "Populating DB…" : "Import data"}
               </Button>
               {!downloadReady && fields.length > 0 && (
                 <Typography variant="caption" color="text.secondary">
@@ -272,6 +282,11 @@ export default function SchemaEditor() {
                 <Button component={RouterLink} to="/" variant="text">
                   Browse dataset
                 </Button>
+              )}
+              {ingestRunning && (
+                <Typography variant="body2" color="text.secondary">
+                  Populating DB…
+                </Typography>
               )}
               {ingestRunning && <CircularProgress size={20} />}
             </Box>

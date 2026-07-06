@@ -48,8 +48,23 @@ export default function AppLayout({ children, showDatasetSelector = false }: Pro
           </Button>
           <Button
             component={RouterLink}
+            to="/datasets"
+            color={
+              location.pathname === "/datasets" ||
+              (location.pathname.startsWith("/datasets/") &&
+                location.pathname !== "/datasets/new")
+                ? "primary"
+                : "inherit"
+            }
+            size="small"
+            sx={{ ml: 1 }}
+          >
+            Datasets
+          </Button>
+          <Button
+            component={RouterLink}
             to="/datasets/new"
-            color={location.pathname.startsWith("/datasets") ? "primary" : "inherit"}
+            color={location.pathname === "/datasets/new" ? "primary" : "inherit"}
             size="small"
             sx={{ ml: 1 }}
           >

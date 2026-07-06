@@ -6,7 +6,7 @@
     "build": "echo 'nothing to build for the backend'",
     "lint": "echo 'no python linter configured yet'",
     "test": "pytest",
-    "db:populate": ".venv/bin/python -m app.services.ingest",
+    "db:populate": ".venv/bin/python -m app.registry_cli populate",
     "db:drop": ".venv/bin/python -m app.registry_cli drop"
   }
 }

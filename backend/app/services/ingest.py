@@ -213,19 +213,22 @@ def _count_rows(path: str) -> int:
         conn.close()
 
 
-def ingest_all_pending() -> None:
-    from app.services.registry import get_active_dataset_id, list_dataset_ids
+def ingest_all_pending(force: bool = False) -> None:
+    from app.services.registry import get_active_dataset_id, init_registry, list_dataset_ids
+
+    init_registry()
 
     for did in list_dataset_ids():
         schema = load_schema(did)
-        if schema.ingest.status != "done" and schema.download.status == "ready":
+        should_ingest = force or schema.ingest.status != "done"
+        if should_ingest and schema.download.status == "ready":
             try:
-                ingest_dataset(did)
+                ingest_dataset(did, force=force)
             except Exception as e:
                 print(f"[ingest] {did}: {e}")
     active = get_active_dataset_id()
     if active:
-        ingest_dataset(active)
+        ingest_dataset(active, force=force)
 
 
 if __name__ == "__main__":
