@@ -97,43 +97,50 @@ a different image+text dataset means dropping its parquet files in `data/<name>/
 
 Requires Docker + Docker Compose.
 
+One command from the repo root:
+
 ```bash
-docker compose up --build
+npm run setup          # npm install + dataset check/move + docker compose up --build
 ```
 
 - Frontend: http://localhost:8080
 - Backend API: http://localhost:8000/docs (Swagger UI)
 
-The first backend startup ingests all 8000 samples (images + thumbnails) into a SQLite DB stored
-in a named Docker volume (`db-data`), so subsequent restarts skip re-ingestion. Ingestion takes
-about a minute.
-
-To stop:
+Or step by step / day-to-day:
 
 ```bash
-docker compose down
+npm run setup-dataset:docker   # verify parquet files are at data/<dataset_name>/
+npm run docker:up              # build + start (frontend :8080, backend :8000)
+npm run docker:logs            # follow container logs
+npm run docker:init-db         # optional: pre-run ingestion as a one-off container
+npm run docker:down            # stop (docker compose down -v also drops the DB volume)
 ```
 
-(Add `-v` to also delete the ingested SQLite volume, forcing re-ingestion next time.)
+The first backend startup ingests all 8000 samples (images + thumbnails) into a SQLite DB stored
+in a named Docker volume (`db-data`), so subsequent restarts skip re-ingestion. Ingestion takes
+about a minute (`npm run docker:init-db` does the same thing ahead of time, if you prefer).
 
 ## Run locally (without Docker)
 
-**Backend** — create the venv and ingest once, first:
+**Backend** — create the venv once, first:
 
 ```bash
+npm run setup-dataset       # verify/move the parquet files into data/<dataset_name>/
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m app.ingest        # one-time: data/flickr8k/*.parquet -> backend/data/flickr8k.db
 ```
 
 Then, from the repo root, with the backend venv still active in that shell:
 
 ```bash
 npm install                 # installs root + frontend + backend workspaces
+npm run init-db             # one-time: data/flickr8k/*.parquet -> backend/data/flickr8k.db
 npm run dev                 # turbo run dev -> starts uvicorn (backend) + vite (frontend)
 ```
+
+(`npm run drop-db` deletes the local SQLite DB, forcing `init-db` to re-ingest.)
 
 Open http://localhost:5173 — Vite proxies `/api` to `http://localhost:8000`.
 

@@ -20,6 +20,11 @@ npm run dev          # turbo run dev   -> vite dev server + uvicorn --reload in 
 npm run build         # turbo run build -> tsc && vite build (backend build is a no-op)
 npm run lint          # turbo run lint  -> eslint (frontend); backend has no linter configured
 npm run test          # turbo run test  -> vitest / pytest, once those suites exist
+npm run setup         # npm install + setup-dataset:docker + docker:up (the "clone and run" path)
+npm run setup-dataset # scripts/setup_dataset.py: verify/move parquet into data/<dataset_name>/
+npm run init-db       # turbo init-db -> backend `python -m app.ingest` (needs venv active)
+npm run drop-db       # delete the local SQLite DB (docker volume: docker compose down -v)
+npm run docker:up|down|logs|init-db   # docker compose wrappers
 ```
 The backend's `dev`/`test`/`lint` scripts (`backend/package.json`) just shell out to
 `uvicorn`/`pytest`/etc. — they require `backend/.venv` to already be created and active (or

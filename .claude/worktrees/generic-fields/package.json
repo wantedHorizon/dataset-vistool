@@ -10,7 +10,16 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "init-db": "turbo init-db",
+    "setup-dataset": "python3 scripts/setup_dataset.py",
+    "setup-dataset:docker": "python3 scripts/setup_dataset.py --docker",
+    "drop-db": "python3 scripts/setup_dataset.py --drop-db",
+    "docker:init-db": "docker compose run --rm init-db",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "setup": "npm install && npm run setup-dataset:docker && npm run docker:up"
   },
   "devDependencies": {
     "turbo": "^2.1.3"
