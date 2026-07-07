@@ -20,22 +20,41 @@ See [`plan.md`](./plan.md) for the full design/build plan.
 - **Split filter** — filter by train / validation / test (when splits are present).
 - **SQL console** — read-only `SELECT` queries against the `samples` table (BLOBs redacted).
 
-## Workflow
-
-1. **Add Dataset** (`/datasets/new`) — paste a HuggingFace URL (e.g. `https://huggingface.co/datasets/jxie/flickr8k`)
-2. **Schema editor** — fields appear from the dataset card; edit types/visibility while parquet downloads
-3. **Import data** — ingest parquet into SQLite (enabled when download is complete)
-4. **Browse** (`/`) — select dataset, search, open JSON modal, run SQL
-
 ## Quick start
 
-Parquet files are not in the repo — download separately or use **Add Dataset** in the UI.
+**Recommended — Docker (one command).** No Python venv, Node install, or `npm install` on your machine. Clone the repo and run:
 
-### Run without Docker
+```bash
+docker compose up --build
+```
 
-**Prerequisites:** Python 3.9+, Node.js 18+, npm.
+When the build finishes, open **http://localhost:8080**. Frontend and backend start together; data persists in the `explorer-data` volume.
 
-**1. One-time setup** (from repo root):
+| | |
+|---|---|
+| App | http://localhost:8080 |
+| API docs | http://localhost:8000/docs |
+| Stop | `docker compose down` |
+| Reset all data | `docker compose down -v` then `docker compose up --build` |
+
+For gated HuggingFace datasets: `HF_TOKEN=hf_… docker compose up --build`.
+
+## How to use
+
+Parquet files are not in the repo — add datasets through the UI (or pre-download Flickr8k for local dev; see [Download the dataset](#download-the-dataset-manual)).
+
+1. **Add dataset link and download** — open **Add Dataset** (`/datasets/new`), paste a HuggingFace URL (e.g. `https://huggingface.co/datasets/jxie/flickr8k`), and click **Add Dataset**. The app fetches the dataset card, extracts fields, and downloads parquet in the background. You are redirected to the schema editor when metadata is ready.
+2. **Choose schema** — on the schema editor (`/datasets/{id}/schema`), review fields extracted from the dataset card. Set each field's type, table visibility, and searchability; click **Save schema** if you change anything. Parquet may still be downloading — progress is shown in the side panel.
+3. **Populate the DB** — when the download finishes, click **Import data** (saves schema first if needed). The app ingests parquet into SQLite; the button shows **Populating DB…** while running.
+4. **Browse your dataset** — click **Browse dataset** or go to **Browse** (`/`). Use the dataset selector in the toolbar to switch between imported datasets. Search, filter by split, open the JSON modal on a row, or run read-only SQL.
+
+Resume an in-progress dataset from **Datasets** (`/datasets`) — open **Schema** for datasets still downloading or not yet imported.
+
+## Local development (without Docker)
+
+Use this path if you are **contributing** or want hot reload. It needs more setup than Docker: Python 3.9+, Node.js 18+, npm, and a backend virtualenv.
+
+**One-time setup** (from repo root):
 
 ```bash
 # Optional: pre-download Flickr8k so first boot seeds a dataset immediately
@@ -53,7 +72,7 @@ cd ..
 npm install
 ```
 
-**2. Start dev servers** (from repo root, with the backend venv active):
+**Start dev servers** (from repo root, with the backend venv active):
 
 ```bash
 source backend/.venv/bin/activate    # required — turbo invokes uvicorn from your PATH
@@ -74,35 +93,16 @@ uvicorn app.main:app --reload --port 8000
 cd frontend && npm run dev
 ```
 
-On first startup the backend creates `backend/data/`, seeds Flickr8k if `datasets/jxie-flickr8k/data/` exists, and ingests any pending datasets. To add more datasets without pre-downloading parquet, open http://localhost:5173/datasets/new and paste a HuggingFace URL.
+On first startup the backend creates `backend/data/`, seeds Flickr8k if `datasets/jxie-flickr8k/data/` exists, and ingests any pending datasets.
 
-**Reset / re-ingest** (venv active, from repo root; **dev-only** — requires `backend/.venv`):
+**Reset / re-ingest** (venv active, from repo root):
 
 ```bash
 npm run db:drop       # wipe all datasets
 npm run db:populate   # re-seed registry + re-ingest from parquet
 ```
 
-In Docker, reset data with `docker compose down -v && docker compose up --build` (the backend image has no `.venv`, so `db:drop`/`db:populate` do not apply there).
-
 **Gated HuggingFace datasets:** set `HF_TOKEN` in your shell before starting the backend.
-
-### Docker
-
-```bash
-# Optional: pre-download Flickr8k for faster first boot
-pip install huggingface_hub
-huggingface-cli download jxie/flickr8k --repo-type dataset --local-dir datasets/jxie-flickr8k
-
-docker compose up --build
-```
-
-- Frontend: http://localhost:8080
-- Backend API: http://localhost:8000/docs
-- Optional `HF_TOKEN` env for gated datasets
-- Data volume: `explorer-data` → `/app/data` in the backend container
-- Stop: `docker compose down`
-- **Reset all data**: `docker compose down -v` then `docker compose up --build`
 
 ## Data layout
 
@@ -128,17 +128,10 @@ npm run db:drop       # wipe registry + all datasets (schemas, sources, SQLite D
 npm run db:populate   # re-seed Flickr8k when empty, then re-ingest from parquet
 ```
 
-Docker reset: `docker compose down -v && docker compose up --build` (drops the `explorer-data` volume).
-
 `db:drop` runs `python -m app.registry_cli drop` — removes everything under the new multi-dataset layout plus legacy `flickr8k.db`.
 `db:populate` runs `python -m app.registry_cli populate` — calls `init_registry()` then ingests pending datasets.
 
-**Docker** — reset via volume wipe (no `npm run db:*` inside the container):
-
-```bash
-docker compose down -v
-docker compose up --build
-```
+In Docker, reset via volume wipe instead (no `npm run db:*` inside the container): `docker compose down -v && docker compose up --build`.
 
 ## Delete a single dataset
 
