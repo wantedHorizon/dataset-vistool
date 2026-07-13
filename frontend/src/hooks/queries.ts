@@ -2,6 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   createDataset,
   deleteDataset,
+  downloadSamples,
+  DownloadRequest,
   fetchActiveDataset,
   fetchDataset,
   fetchDatasets,
@@ -155,5 +157,11 @@ export function useSample(datasetId: string | null, id: number | null) {
 export function useSql(datasetId: string | null) {
   return useMutation({
     mutationFn: (query: string) => runSql(datasetId as string, query),
+  });
+}
+
+export function useDownloadSamples(datasetId: string | null) {
+  return useMutation({
+    mutationFn: (req: DownloadRequest) => downloadSamples(datasetId as string, req),
   });
 }

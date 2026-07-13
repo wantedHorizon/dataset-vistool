@@ -76,12 +76,27 @@ export interface ReparseResponse {
   schema_source?: string | null;
 }
 
+function formatDetail(detail: unknown, fallback: string): string {
+  if (detail == null) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) =>
+        typeof item === "object" && item && "msg" in item
+          ? String((item as { msg: unknown }).msg)
+          : String(item),
+      )
+      .join("; ");
+  }
+  return String(detail);
+}
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = res.statusText;
     try {
       const body = await res.json();
-      detail = body.detail ?? detail;
+      detail = formatDetail(body.detail, detail);
     } catch {
       /* ignore */
     }
@@ -193,4 +208,45 @@ export async function runSql(datasetId: string, query: string): Promise<SqlRespo
       body: JSON.stringify({ query }),
     }),
   );
+}
+
+// --- Batch download ---
+
+export type DownloadMode = "ids" | "all" | "range";
+
+export interface DownloadRequest {
+  mode: DownloadMode;
+  split?: string;
+  search?: string;
+  ids?: number[];
+  offset?: number;
+  limit?: number;
+  exclude_ids?: number[];
+}
+
+export async function downloadSamples(datasetId: string, req: DownloadRequest): Promise<void> {
+  const res = await fetch(`${dsBase(datasetId)}/download`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = formatDetail(body.detail, detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(String(detail));
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${datasetId}-samples.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

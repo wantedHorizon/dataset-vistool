@@ -12,13 +12,15 @@ import {
 import AppLayout from "../components/AppLayout";
 import Toolbar from "../components/Toolbar";
 import SamplesTable from "../components/SamplesTable";
+import DownloadBar from "../components/DownloadBar";
 import SampleModal from "../components/SampleModal";
 import SqlConsole from "../components/SqlConsole";
-import { useDataset, useSamples, useStats } from "../hooks/queries";
+import { useDataset, useDownloadSamples, useSamples, useStats } from "../hooks/queries";
 import { useDebounced } from "../hooks/useDebounced";
 import { useDatasetContext } from "../context/DatasetContext";
 import { buildColumns, defaultVisibleKeys, searchableLabels } from "../components/tableColumns";
 import { loadVisibleColumns, saveVisibleColumns } from "../lib/columnStorage";
+import { DownloadRequest } from "../api/client";
 
 export default function Home() {
   const { activeDatasetId, ingestedDatasets, isLoading: ctxLoading } = useDatasetContext();
@@ -39,6 +41,24 @@ export default function Home() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
 
+  const [rowMarks, setRowMarks] = useState<Map<number, "include" | "exclude">>(
+    () => new Map(),
+  );
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
+
+  const included = useMemo(() => {
+    const s = new Set<number>();
+    for (const [id, mark] of rowMarks) if (mark === "include") s.add(id);
+    return s;
+  }, [rowMarks]);
+  const excluded = useMemo(() => {
+    const s = new Set<number>();
+    for (const [id, mark] of rowMarks) if (mark === "exclude") s.add(id);
+    return s;
+  }, [rowMarks]);
+
+  const download = useDownloadSamples(activeDatasetId);
+
   useEffect(() => {
     if (activeDatasetId && defaultVisible.length && columnKeys.length) {
       setVisibleColumns(
@@ -55,12 +75,45 @@ export default function Home() {
     setPage(0);
   }, [activeDatasetId]);
 
+  useEffect(() => {
+    setRowMarks(new Map());
+    setSelectAllMatching(false);
+  }, [activeDatasetId, split, search]);
+
+  useEffect(() => {
+    download.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDatasetId, split, search]);
+
   const handleToggleColumn = (key: string) => {
     setVisibleColumns((cols) => {
       const next = cols.includes(key) ? cols.filter((c) => c !== key) : [...cols, key];
       if (activeDatasetId) {
         saveVisibleColumns(activeDatasetId, next);
       }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setRowMarks(new Map());
+    setSelectAllMatching(false);
+  };
+
+  const onToggleRow = (id: number) => {
+    setSelectAllMatching(false);
+    setRowMarks((prev) => {
+      const next = new Map(prev);
+      if (next.has(id)) next.delete(id);
+      else next.set(id, "include");
+      return next;
+    });
+  };
+
+  const onExcludeRow = (id: number) => {
+    setRowMarks((prev) => {
+      const next = new Map(prev);
+      next.set(id, "exclude");
       return next;
     });
   };
@@ -79,9 +132,54 @@ export default function Home() {
   const { data: stats } = useStats(activeDatasetId);
   const { data, isLoading, isFetching, error } = useSamples(sampleParams);
 
+  const onTogglePage = (select: boolean) => {
+    const pageIds = data?.rows.map((r) => r.id) ?? [];
+    setSelectAllMatching(false);
+    setRowMarks((prev) => {
+      const next = new Map(prev);
+      for (const id of pageIds) {
+        if (select) next.set(id, "include");
+        else if (next.get(id) === "include") next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const runDownload = (partial: Omit<DownloadRequest, "split" | "search">) => {
+    const base: DownloadRequest = {
+      ...partial,
+      ...(split ? { split } : {}),
+      ...(search ? { search } : {}),
+    };
+    if (partial.mode === "ids") {
+      download.mutate({
+        mode: "ids",
+        ids: [...included],
+        ...(split ? { split } : {}),
+        ...(search ? { search } : {}),
+      });
+      return;
+    }
+    const exclude_ids = excluded.size > 0 ? [...excluded] : undefined;
+    download.mutate({
+      ...base,
+      ...(exclude_ids ? { exclude_ids } : {}),
+    });
+  };
+
   const searchPlaceholder = schema
     ? `Search ${searchableLabels(schema)}…`
     : "Search…";
+
+  const filterActive = Boolean(split || search);
+  const matchLabel =
+    data && stats
+      ? filterActive
+        ? `${data.total} matches (of ${stats.total})`
+        : `${stats.total} samples`
+      : stats
+        ? `${stats.total} samples`
+        : null;
 
   if (ctxLoading) {
     return (
@@ -114,9 +212,9 @@ export default function Home() {
   return (
     <AppLayout showDatasetSelector>
       <Container maxWidth="xl" sx={{ py: 3 }}>
-        {stats && (
+        {matchLabel && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {stats.total} samples
+            {matchLabel}
           </Typography>
         )}
 
@@ -140,6 +238,20 @@ export default function Home() {
           searchPlaceholder={searchPlaceholder}
         />
 
+        {data && (
+          <DownloadBar
+            total={data.total}
+            includedCount={included.size}
+            excludedCount={excluded.size}
+            selectAllMatching={selectAllMatching}
+            onSelectAllMatching={() => setSelectAllMatching(true)}
+            onClearSelection={clearSelection}
+            isPending={download.isPending}
+            error={download.error ? (download.error as Error).message : null}
+            onDownload={runDownload}
+          />
+        )}
+
         {sqlOpen && <SqlConsole />}
 
         {error && <Alert severity="error">{(error as Error).message}</Alert>}
@@ -157,6 +269,11 @@ export default function Home() {
                 onOpenSample={setActiveId}
                 visibleColumns={visibleColumns}
                 search={search}
+                included={included}
+                excluded={excluded}
+                onToggleRow={onToggleRow}
+                onExcludeRow={onExcludeRow}
+                onTogglePage={onTogglePage}
               />
             </Box>
             <TablePagination
