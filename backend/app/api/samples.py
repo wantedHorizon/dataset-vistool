@@ -3,10 +3,12 @@ import sqlite3
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 
 from app.db.columns import select_columns
 from app.db.connection import get_connection
-from app.models.api import SamplesPage, Stats
+from app.models.api import DownloadRequest, SamplesPage, Stats
+from app.services.download_zip import build_download_zip
 from app.services.query import build_samples_where, has_image_field, row_to_dict
 from app.services.registry import load_schema
 
@@ -89,6 +91,19 @@ def get_sample(dataset_id: str, sample_id: int) -> Dict[str, Any]:
         return row_to_dict(row, schema, dataset_id)
     finally:
         conn.close()
+
+
+@router.post("/api/datasets/{dataset_id}/download")
+def download_samples(dataset_id: str, req: DownloadRequest) -> StreamingResponse:
+    """ZIP export: mode all (filter only), range (filter+window), or ids."""
+    chunks = build_download_zip(dataset_id, req)
+    return StreamingResponse(
+        chunks,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{dataset_id}-samples.zip"',
+        },
+    )
 
 
 @router.get("/api/datasets/{dataset_id}/images/{sample_id}")

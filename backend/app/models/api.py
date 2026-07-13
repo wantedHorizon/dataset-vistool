@@ -1,9 +1,47 @@
 """API request/response DTOs."""
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from .dataset import FieldDef
+
+
+class DownloadMode(str, Enum):
+    ids = "ids"
+    all = "all"
+    range = "range"
+
+
+class DownloadRequest(BaseModel):
+    mode: DownloadMode
+    split: Optional[str] = None
+    search: Optional[str] = None
+    ids: Optional[List[int]] = None
+    offset: Optional[int] = Field(None, ge=0)
+    limit: Optional[int] = Field(None, ge=1)
+    exclude_ids: Optional[List[int]] = None
+
+    @model_validator(mode="after")
+    def validate_mode_fields(self) -> "DownloadRequest":
+        if self.mode == DownloadMode.all:
+            if self.ids is not None:
+                raise ValueError("ids must not be set when mode is 'all'")
+            if self.offset is not None or self.limit is not None:
+                raise ValueError("offset and limit must not be set when mode is 'all'")
+        elif self.mode == DownloadMode.range:
+            if self.ids is not None:
+                raise ValueError("ids must not be set when mode is 'range'")
+            if self.offset is None or self.limit is None:
+                raise ValueError("offset and limit are required when mode is 'range'")
+        elif self.mode == DownloadMode.ids:
+            if not self.ids:
+                raise ValueError("ids is required and must be non-empty when mode is 'ids'")
+            if self.offset is not None or self.limit is not None:
+                raise ValueError("offset and limit must not be set when mode is 'ids'")
+            if self.exclude_ids is not None:
+                raise ValueError("exclude_ids must not be set when mode is 'ids'")
+        return self
 
 
 class DatasetSummary(BaseModel):
